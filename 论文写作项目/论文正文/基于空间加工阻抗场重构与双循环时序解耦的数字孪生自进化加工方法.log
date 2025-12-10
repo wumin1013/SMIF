@@ -1,4 +1,4 @@
-This is XeTeX, Version 3.141592653-2.6-0.999997 (TeX Live 2025) (preloaded format=xelatex 2025.12.3)  3 DEC 2025 15:31
+This is XeTeX, Version 3.141592653-2.6-0.999997 (TeX Live 2025) (preloaded format=xelatex 2025.12.10)  11 DEC 2025 00:00
 entering extended mode
  restricted \write18 enabled.
  file:line:error style messages enabled.
@@ -702,10 +702,10 @@ Package rerunfilecheck Info: File `基于空间加工阻抗场重构与双循环
 (rerunfilecheck)             Checksum: F3BFE7690DBE36F06F46C73CBC98E9D0;3923.
  ) 
 Here is how much of TeX's memory you used:
- 17958 strings out of 473831
- 387572 string characters out of 5733137
+ 17958 strings out of 473832
+ 387572 string characters out of 5733157
  800121 words of memory out of 5000000
- 40766 multiletter control sequences out of 15000+600000
+ 40765 multiletter control sequences out of 15000+600000
  573412 words of font info for 97 fonts, out of 8000000 for 9000
  1348 hyphenation exceptions out of 8191
  93i,10n,111p,731b,602s stack positions out of 10000i,1000n,20000p,200000b,200000s
