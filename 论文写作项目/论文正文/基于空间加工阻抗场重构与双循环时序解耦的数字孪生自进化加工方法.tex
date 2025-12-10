@@ -1,0 +1,366 @@
+﻿\documentclass[preprint,12pt]{elsarticle}
+
+% --- 中文支持 (投稿英文期刊时请删除此行) ---
+\usepackage{ctex}
+% -----------------------------------------
+
+\usepackage{amssymb}
+\usepackage{amsmath}
+\usepackage{graphicx}
+\usepackage{booktabs} % 用于三线表
+\usepackage{geometry}
+\usepackage{hyperref}
+\usepackage{subcaption}
+\usepackage{caption} % 有些elsarticle模板需要显式引入这个
+\usepackage{float}
+
+% 设置期刊名称
+\journal{Journal of Manufacturing Systems}
+
+\begin{document}
+
+\begin{frontmatter}
+
+%% 标题 [基于 source: 334]
+\title{基于空间加工阻抗场重构与双循环时序解耦的数字孪生自进化加工方法}
+
+%% 作者信息 (此处需您自行补充具体人名)
+\author[1]{作者姓名}
+\affiliation[1]{organization={某某大学/机构},
+            addressline={某某路}, 
+            city={某某市},
+            postcode={000000}, 
+            country={中国}}
+
+%% 摘要 [基于 source: 336-341]
+\begin{abstract}
+
+\end{abstract}
+
+%% 关键词 [基于 source: 336, 337]
+\begin{keyword}
+数字孪生 \sep 智能加工 \sep 自进化 \sep 空间加工阻抗场 \sep 工艺信息表 \sep 工艺规划
+\end{keyword}
+
+\end{frontmatter}
+
+%% 正文开始
+
+%% [基于 source: 335-340]
+\section{引言}
+在工业4.0与智能制造的浪潮下，制造系统正经历从自动化执行向自主化决策的深刻变革 \cite{Monostori2014, Kusiak2018,Liao2017}。数字孪生（Digital Twin, DT）作为连接物理实体与赛博空间的关键使能技术，已成为实现这一变革的关键使能技术\cite{Grieves2015}。 早期的数字孪生研究主要致力于构建高保真的几何与物理模型，以实现对制造过程的可视化监控与离线仿真\cite{Tao2018,Kritzinger2018,Liu2021}。然而，随着制造环境复杂度的提升，仅仅实现“静态映射（Static Mapping）”已不足以支撑系统在不确定性环境下的自主决策能力。学术界近期指出，理想的智能制造系统应具备类似生物体的“认知”与“进化”特征——即能够通过实时感知数据的反馈，自主更新赛博空间的知识库，并持续迭代优化决策策略\cite{Ali2021}。正如 Tao 等人\cite{Tao2019}和 Zheng 等人\cite{Zheng2018}提出的“认知数字孪生（Cognitive Digital Twin）”概念所述，通过构建“感知-学习-进化”的闭环，赋予数字孪生体自主成长的能力，是当前从“数字制造”迈向“智能制造”的关键方法论。 
+
+将这一自进化方法论落地于计算机数控（CNC）加工领域显得尤为迫切。作为精密制造的基础环节，CNC加工的效率与质量高度依赖于工艺参数（如进给速度、切削深度、切削宽度、主轴转速）的科学决策\cite{Yusup2012}。然而，实际加工过程是一个高度动态且非线性的时变物理系统\cite{Teti2010}。刀具磨损的累积、材料微观组织的非均匀性以及机床热变形等因素，导致物理加工状态随时间不断漂移\cite{Kjicai2024}。遗憾的是，当前主流的工艺规划仍主要依赖于手册推荐值或基于理想实验环境建立的静态机理模型（如静态切削力系数）。这种“静态模型”无法捕捉“动态物理”的演变，导致赛博空间的仿真预测与物理空间的实际状态之间产生了显著的 “仿真-现实鸿沟（Sim-to-Real Gap）”\cite{Walker2022}。由于缺乏模型自进化的机制，预先优化的工艺参数在加工过程中往往逐渐失效，工艺人员不得不采用保守参数以效率折损换取安全边界加工安全，严重限制了高端装备性能的释放。
+
+为了应对工艺优化的挑战，现有的研究主要沿离线规划与在线控制两条路径独立发展，但二者之间存在着难以逾越的“时空错位”。 离线优化（Offline Optimization）试图在加工前解决所有问题。学者们利用解析模型或有限元仿真（FEM）来预测切削力学行为并规划参数。Melkote等\cite{Melkote2017} 基于切削物理和现象学建模预测了切削力与切屑形态。Azvar等\cite{Azvar2021} 通过仿真滚齿过程优化了切削力；Berger等\cite{Berger2021} 则针对钛合金加工优化切屑流动以抑制振动。除了物理仿真，基于几何运动学的速度规划也被广泛研究，Erkorkmaz等\cite{Erkorkmaz2013}和 Liu等\cite{Liu2017} 通过建立刀具-工件啮合模型，在满足捷度（Jerk）和机床动力学约束的前提下生成平滑的B样条速度曲线； Liang等\cite{Liang2022} 利用遗传算法进一步优化了多轴机床的全局时间效率。近年来， Xie等\cite{Xie2021} 更是引入神经网络（ANN）构建数据驱动模型以提升预测精度。然而，所有离线优化的共性缺陷在于“开环（Open-loop）”本质：一旦G代码生成并投入运行，模型便与物理世界断开连接。无论模型多么精密，都无法预知加工中随机发生的刀具磨损、材料硬点或热漂移。这种“预测与现实的静态脱节”，使得离线优化策略随加工时间推移而迅速退化。
+
+为了弥补离线预测的失效，在线自适应控制（Online Adaptive Feedrate Control, AFC）应运而生。Byrne等\cite{Byrne2003} 指出实时响应是应对过程变化的关键。Munoa等\cite{Munoa2016} 综述了通过实时调整主轴转速抑制颤振的技术；Altintas等\cite{Altintas2017} 集成了虚拟仿真与在线监测，通过检测过载实时降低进给率以保护刀具。最新的进展如Kim等\cite{Kim2024}于提出的参考负载控制曲线（RLCC）方法，试图克服传统PID控制的滞后性。然而，现有的在线控制虽然解决了“实时性”问题，却陷入了缺乏长时序视野的困境。绝大多数AFC系统本质上是“被动响应（Reactive）”的——它们主要致力于对瞬时负载偏差的实时抑制，却缺乏对偏差成因的深层认知与推理机制。正如 Jiang等\cite{Jiang2024}在构建智能机床的系统性认知模型时深刻指出，现有系统缺乏持续学习的机制，每一次加工任务结束后，系统对物理环境的认知水平并没有提升。换言之，离线优化有全局视野但无实时反馈，在线控制有实时反馈但无知识积累。
+
+尽管在线自适应控制（AFC）解决了加工过程的实时响应问题，但现有的AFC系统本质上仍是被动响应式（Reactive）的。它们致力于抑制瞬时负载偏差，却缺乏对偏差成因的逆向推理与知识沉淀机制。这导致了赛博空间（模型预测）与物理空间（实际状态）之间存在显著的学习断层（Learning Gap）：物理域的实时数据流未能转化为赛博域的可泛化工艺知识，使得制造系统陷入低水平重复控制的困境，无法实现真正的自主进化。
+
+为建立闭环映射，本文提出了一种基于空间加工阻抗场（Spatial Machining Impedance Field）的数字孪生自进化加工框架。不同于传统方法关注单一维度的材料硬度或几何余量，本框架建立了一种物理-几何耦合的集总阻抗表征。 基于此，我们构建了紧密耦合的双循环机制： 1）执行环：在线应对高频扰动，并将实测负载沉淀为沿路径分布的阻抗知识； 2）优化环：基于全场的阻抗分布图，识别全局加工瓶颈（Global Bottlenecks），引入拓扑一致性约束，对切削层结构（Layer Structure）与运动参数进行全局重构，消除‘几何孤岛’效应，实现工艺系统的自主进化。
+
+本文提出的基于SMIF的双循环自进化框架如图\ref{fig:SMIF-loop} 所示。该框架通过微观执行环与宏观进化环的有机结合，解决了Sim-to-Real Gap，实现工艺自主进化。
+
+\begin{figure}[htbp]
+    \centering
+    % [图片占位符] 替换原 \includegraphics 命令
+    \fbox{\parbox[c][5cm]{0.8\textwidth}{\centering \textbf{图 1：基于空间加工阻抗场（SMIF）的双循环自进化数字孪生加工框架 (待插入图片)}}}
+    \caption{基于空间加工阻抗场（SMIF）的双循环自进化数字孪生加工框架}
+    \label{fig:SMIF-loop}
+\end{figure}
+
+%% [基于 source: 344-381]
+\section{物理-几何融合的数字孪生建模}
+
+本章旨在构建能够描述复杂切削过程的统一数学模型。针对传统建模中物理与几何割裂的问题，本文建立基于行程域（Stroke Domain, $s$）的统一映射，并将加工过程转化为沿刀具路径分布的空间加工阻抗场。
+
+\subsection{基于行程域的离散化表征}
+
+\subsubsection{传统建模方法的局限性分析}
+在构建高保真加工数字孪生时，现有的离散化策略存在本质缺陷：
+\begin{itemize}
+    \item \textbf{时间域建模}：传统监测数据 $P(t)$ 严重依赖采样频率，产生大量位置重叠的冗余数据，且无法直接对应工件空间坐标。
+    \item \textbf{体素建模}：计算复杂度随精度呈立方增长，难以支撑在线控制。
+\end{itemize}
+
+\subsubsection{行程域稳态区间与工艺信息表 (PIT)}
+本文提出行程域离散化方法。定义刀具路径的总行程长度为 $L$，路径上任意一点的位置由标量 $s \in [0, L]$ 唯一确定。
+
+\textbf{定义 2.1（稳态区间）：}
+将连续路径离散化为一系列区间 $\{Z_k\}$。在任意区间 $Z_k$ 内，几何属性（切宽 $a_e$、切深 $a_p$）保持相对恒定（变化率低于阈值 $\epsilon$）。
+
+基于此，构建\textbf{工艺信息表（Process Info Table, PIT）}。PIT 摒弃了瞬态决策状态，专注于存储每个区间的几何与物理属性基准：
+
+\begin{table}[htbp]
+\centering
+\caption{工艺信息表 (PIT) 结构示例}
+\label{tab:pit}
+\begin{tabular}{lllll}
+\toprule
+\textbf{索引} & \textbf{行程区间} & \textbf{几何特征} & \textbf{规划进给} & \textbf{阻抗特征} \\
+(Index) & (Stroke Range) & (Geometry) & (Planning) & (Impedance) \\
+\midrule
+Zone\_ID & Start $\sim$ End (s) & $a_e, a_p$ & $F_{plan}$ & $K_c$ \\
+\#101 & 10.5 $\sim$ 25.0 & (5.0, 10.0) & 800 mm/min & 2.15 \\
+\#102 & 25.0 $\sim$ 40.0 & (5.0, 10.0) & 600 mm/min & 2.48 \\
+\#103 & 40.0 $\sim$ 80.0 & (8.0, 10.0) & 750 mm/min & 2.18 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+为了克服时域数据的冗余性，本文建立了如图 \ref{fig:stroke_domain} 所示的行程域离散化模型。PIT 表作为核心数据载体，实现了几何与物理信息的空间对齐。
+
+\begin{figure}[htbp]
+    \centering
+    % [图片占位符] 替换原 \includegraphics 命令
+    \fbox{\parbox[c][5cm]{0.8\textwidth}{\centering \textbf{图 2：物理-几何融合建模与行程域离散化 (待插入图片)}}}
+    \caption{物理-几何融合建模与行程域离散化}
+    \label{fig:stroke_domain}
+\end{figure}
+
+【本节结论：PIT 结构实现了“物理-几何-位置”的完全对齐，使得后续的优化算法可以直接针对特定的空间位置进行操作，而无需进行时空转换。】
+
+\subsection{空间加工阻抗场 (SMIF) 与物理映射}
+\subsubsection{空间加工阻抗场定义}
+传统的切削力模型往往停留在数值曲线层面。为了实现全局认知，本文构建了如图 \ref{fig:smif_a} (a) 所示的空间加工阻抗场（SMIF）。该场以伪彩图形式直观映射了沿刀具路径分布的切削抵抗力。
+
+\begin{figure}[H] % figure* 确保跨双栏居中
+    \centering
+    
+    % --- 第一行：子图 (a) 独占一行 ---
+    % 建议宽度设为 0.7~0.8\textwidth，居中显示，避免太大显得空旷
+    \begin{subfigure}[b]{0.8\textwidth}
+        \centering
+        % 占位符
+        \fbox{\parbox[c][5cm]{\textwidth}{\centering \textbf{(a) 3D Spatial Mapping} \\ \small 基于刀具路径的 3D 伪彩阻抗映射 (大图展示细节)}}
+        \caption{3D Spatial Mapping}
+        \label{fig:smif_a}
+    \end{subfigure}
+    
+    % --- 强制换行并增加一点垂直间距 ---
+    \par\bigskip 
+    
+    % --- 第二行：子图 (b) 和 (c) 并列 ---
+    % 宽度设为 0.48\textwidth，中间用 \hfill 撑开
+    \begin{subfigure}[b]{0.48\textwidth}
+        \centering
+        \fbox{\parbox[c][4cm]{\textwidth}{\centering \textbf{(b) Sim-to-Real Gap} \\ \small 理论 vs 实测对比}}
+        \caption{Sim-to-Real Gap}
+        \label{fig:smif_b}
+    \end{subfigure}
+    \hfill % 把 (b) 和 (c) 往两边推
+    \begin{subfigure}[b]{0.48\textwidth}
+        \centering
+        \fbox{\parbox[c][4cm]{\textwidth}{\centering \textbf{(c) Bottleneck ID} \\ \small 阻抗波形与红区}}
+        \caption{Bottleneck ID}
+        \label{fig:smif_c}
+    \end{subfigure}
+    
+    % --- 总标题 ---
+    \caption{\textbf{空间加工阻抗场 (SMIF) 的构建与演化。} (a) 基于刀具路径的 3D 伪彩阻抗映射；(b) 初始静态模型与演化后模型的切削力对比，展示 Sim-to-Real Gap 的收敛；(c) 沿行程域展开的阻抗波形，红色阴影区域表示识别出的全局瓶颈。}
+    \label{fig:smif}
+\end{figure}
+
+对于行程上的任意位置 $s$，定义等效阻抗系数 $Z(s)$。该系数不再是单纯的材料常数，而是反映瞬时切削抵抗力的集总参数（Lumped Parameter）：
+在 PIT 表结构中，我们将连续场离散化为区间阻抗值 $K_c$。这一更名明确了模型不仅处理“硬度”，更处理“余量不均”和“刀具磨损”。
+
+\subsubsection{物理控制方程 (行程域形式)}
+在行程域中，切削功率不再被视为时间的函数，而是位置 $s$ 处的几何参数与运动参数的耦合结果。控制方程定义为：
+
+\begin{equation}
+P(s) = P_{idle} + Z(s) \cdot MRR(s) = P_{idle} + Z(s) \cdot a_p(s) a_e(s) F(s)
+\end{equation}
+
+其中：
+\begin{itemize}
+    \item $s$：刀具沿路径的位移坐标。
+    \item $F(s)$：刀具在位置 $s$ 处的实际进给速度（单位：mm/min）。
+    \item $a_p(s), a_e(s)$：位置 $s$ 处的仿真几何参数。
+    \item $P_{idle}$：空载功率。
+\end{itemize}
+
+【本节结论：明确了功率是由几何设定值与\textbf{阻抗场}共同决定的。】
+
+\subsection{动态优化问题描述}
+基于行程域表征，我们将加工优化问题建模为沿路径的空间规划问题。
+
+\textbf{目标函数 (Objective)}：在总行程 $L$ 内，最大化整体材料去除效率：
+\begin{equation}
+\max J = \int_{0}^{L} MRR(s) ds = \int_{0}^{L} a_p(s) a_e(s) F(s) ds
+\end{equation}
+
+\textbf{约束条件 (Constraints)}：
+对于路径上的任意位置 $s$：
+\begin{equation}
+P(s) = P_{idle} + Z(s) \cdot MRR(s) \le P_{safe}
+\end{equation}
+
+\textbf{关键论证}：
+由于 $Z(s)$ 在加工前是未知的（或仅有粗略估计），且 $Z(s)$ 的设定直接影响 $P(s)$，这是一个含有参数不确定性的约束优化问题。我们需要通过第3章的“双循环”策略，先辨识 $Z(s)$，再优化 $F(s)$ 和几何参数。
+
+\section{时序解耦的自进化控制策略}
+
+针对加工过程中的欠定性问题，本章提出双循环时序解耦框架（APAEF）。本章重点阐述如何利用执行环沉淀的阻抗场知识，在进化环中进行全局瓶颈驱动的工艺重构。
+
+\subsection{双循环求解框架}
+\subsubsection{“物理-几何”耦合的欠定性挑战}
+如图 \ref{fig:smif} (b) 所示，初始的静态模型往往假设阻抗均匀分布。然而，在实际加工中，由于刀具磨损或材料不均，真实的阻抗场呈现出明显的非平稳特征。SMIF 的核心价值正在于能够敏锐地捕捉这些无法直接观测的物理状态的变化。如 2.3 节所述，加工优化的核心约束为 $P(s) \le P_{safe}$。在真实的加工场景中，该方程呈现典型的欠定性（Under-determined Nature）：
+\begin{itemize}
+    \item \textbf{物理不确定性}：加工阻抗 $Z(s)$ 随位置随机波动；
+    \item \textbf{几何不确定性}：实际切削截面往往因毛坯公差或上一工序残留而偏离理论值。
+\end{itemize}
+由于单次功率测量无法数学上区分是“材料属性硬化”还是“几何余量突增”，若试图在单一控制层级同时辨识参数与优化工艺，将导致解的不唯一性与系统振荡。
+
+\subsubsection{核心机理：基于阻抗场的工况解耦}
+利用\textbf{等效阻抗系数}吸收所有未知的几何误差与物理波动。无论功率异常是由“余量变大”还是“硬度变高”引起，在控制层级均被视为\textbf{“空间阻抗突增”}，从而统一了优化目标。
+
+该定义的\textbf{工程合理性}在于：
+\begin{itemize}
+    \item \textbf{控制等效性（Control Equivalence）}：无论功率的异常升高是由材料硬点（$K_c$ 升高）还是毛坯余量过多（$a_p \cdot a_e$ 升高）引起，其体现均为\textbf{加工阻抗的增大}。对于控制系统而言，针对 $P$ 升高采取的抑制策略（降低进给或减小切深）均能有效将功率限制在安全域内。
+    \item \textbf{误差收敛性（Error Convergence）}：随着加工过程的逐层推进，前一层的几何误差通过切削被物理消除，几何比率逐渐趋近于 1。此时，$Z(s)$ 将自适应地收敛于真实的材料属性。
+\end{itemize}
+
+【关键结论：通过引入 $Z(s)$，我们将复杂的“物理-几何”二元解耦问题，转化为单一维度的\textbf{“空间阻力场”重构问题}。这确保了算法在几何误差存在的情况下，依然具备鲁棒的安全边界。】
+
+\subsection{执行环与进化环的架构定义}
+基于上述集总参数假设，利用多层加工的时序特性，我们将求解过程拆解为两个时间尺度迥异但数据互通的循环，如图 \ref{fig:loops} 所示：
+
+\begin{figure}[htbp]
+    \centering
+    % [图片占位符] 替换原 \includegraphics 命令
+    \fbox{\parbox[c][6cm]{\textwidth}{\centering \textbf{图 4：双循环控制逻辑框图 (待插入图片)}}}
+    \caption{基于空间加工阻抗场（SMIF）的双循环自进化数字孪生加工框架（含双循环控制逻辑框图）}
+    \label{fig:loops}
+\end{figure}
+
+\begin{enumerate}
+    \item \textbf{执行环（Execution Loop, RT-AFC）—— 微观在线响应}
+    \begin{itemize}
+        \item \textbf{定位}：毫秒级（ms-level）的在线反馈控制。
+        \item \textbf{任务}：假设当前的几何模型与物理基准（来自 PIT 表）暂时可信，专注于处理高频随机扰动。
+        \item \textbf{机制}：通过实时监测功率偏差，动态修调进给倍率（Override）。
+        \item \textbf{产出}：不仅保证了当前层的安全，更为认知环提供了包含丰富工况信息的实测数据集。
+    \end{itemize}
+
+    \item \textbf{进化环（Evolutionary Loop, Re-planning）—— 宏观离线重构}
+    \begin{itemize}
+        \item \textbf{定位}：层间（Inter-layer）的全局优化决策。
+        \item \textbf{任务}：利用上一层沉淀的 $Z(s)$ 分布，识别系统的结构性瓶颈。
+        \item \textbf{机制}：当发现某区间阻抗持续过高导致进给受限时，打破既定刀路结构，对切削参数进行全维重构。
+        \item \textbf{产出}：生成新的 NC 代码与更新后的 PIT 表，彻底消除几何误差或物理硬度带来的效率短板，实现工艺系统的自主进化。
+    \end{itemize}
+\end{enumerate}
+
+\subsection{执行环：基于统计的迭代进给修调}
+执行环（RT-AFC）的工作机理并非瞬时调节，而是基于稳态区间统计特征的代际（Run-to-Run）优化。
+
+\textbf{算法逻辑}：
+\begin{enumerate}
+    \item \textbf{预测与测量}：对于第 $N$ 轮加工中的某个稳态区间 $i$，系统计算理论预测负载 $P_{pred}$，并记录实测负载 $P_{meas}$。
+    \item \textbf{统计对比}：当刀具驶离该区间后，计算区间实测平均负载：
+    \begin{equation}
+    \bar{P}_{meas} = \frac{1}{T_{zone}} \int_{t_{in}}^{t_{out}} P_{meas}(t) dt
+    \end{equation}
+    \item \textbf{修调决策}：对比 $\bar{P}_{meas}$ 与 $P_{target}$，生成第 $N+1$ 轮的进给倍率 $R$：
+    \begin{equation}
+    R_{i, N+1} = R_{i, N} \cdot \left( 1 + \gamma \frac{P_{target} - \bar{P}_{meas}}{P_{target}} \right)
+    \end{equation}
+    其中 $\gamma$ 为迭代步长。
+\end{enumerate}
+
+【本节结论：该机制避免了对瞬时高频噪声的过度反应，保证了每一轮次加工参数的平稳性与收敛性。】
+
+\subsection{认知环：K值的中值滤波更新}
+认知环负责利用实测数据更新 PIT 表中的物理属性列（Physics Column），其核心在于从带噪信号中提取真实的材料比切削能。
+
+\textbf{更新算法}：
+\begin{enumerate}
+    \item \textbf{点级反解 (Point-wise Calculation)}：
+    对于区间内的每一个采样点 $j$，根据瞬时功率和当前实际进给计算瞬时加工阻抗：
+    \begin{equation}
+    Z_j = \frac{P_j - P_{idle}}{MRR_j}
+    \end{equation}
+
+    \item \textbf{区间聚合 (Zone Aggregation)}：
+    由于原始信号包含高频振动与电磁噪声，直接使用均值容易受离群点（Outliers）影响。本文采用\textbf{中值滤波法（Median Filtering）}确定该区间的代表性值 $Z_{zone}$：
+    \begin{equation}
+    Z_{zone} = \text{Median} \{ Z_1, Z_2, ..., Z_M \}
+    \end{equation}
+
+    \item \textbf{知识沉淀}：
+    将计算出的 $Z_{zone}$ 更新至 PIT 表的对应行，作为下一轮 RT-AFC 预测计算的物理基准。
+\end{enumerate}
+
+\subsection{进化环：全局瓶颈驱动的工艺全参数重构}
+当认知环完成对 PIT 表中阻抗值的更新后，进化环在层间阶段启动。不同于传统方法仅针对局部区间调整参数（容易导致加工表面呈台阶状的“几何孤岛”效应），本节提出基于层级瓶颈（Layer-level Bottleneck）的全局重构策略。
+
+\subsubsection{全局阻抗分析与瓶颈识别}
+系统读取整层所有稳态区间的阻抗分布，识别绝对瓶颈区间集合 $\Omega_{bottleneck}$。定义：在最低许用进给 $F_{min}$ 下，理论功率仍超过安全阈值的区间：
+\begin{equation}
+\Omega_{bottleneck} = \{ s \mid P(s, F_{min}) > P_{safe} \}
+\end{equation}
+
+基于 SMIF 的重构策略始于对瓶颈的精确识别。如图 \ref{fig:replan} 所示，系统通过扫描行程域内的阻抗波形，定位所有超过安全阈值的区间，这些“红色”区域正是后续拓扑重构（策略 A/B）的作用对象。
+
+\begin{figure}[htbp]
+    \centering
+    % [图片占位符] 替换原 \includegraphics 命令
+    \fbox{\parbox[c][5cm]{\textwidth}{\centering \textbf{图 4：全局瓶颈驱动的工艺重构策略示意图 (待插入图片)}}}
+    \caption{全局瓶颈驱动的工艺重构策略示意图}
+    \label{fig:replan}
+\end{figure}
+
+\subsubsection{几何拓扑重构决策}
+针对 $\Omega_{bottleneck}$ 的存在，本框架引入两种拓扑重构算子：
+\begin{itemize}
+    \item \textbf{全局降维算子 (Global Layering)}：通过降低全场切削深度，将二维阻抗峰值在第三维度（切深方向）进行均摊，适用于高占比瓶颈工况。
+    \item \textbf{局部特征挖掘算子 (Local Pocketing)}：保持全局拓扑结构不变，仅在瓶颈邻域内生成子结构路径（Sub-structures），通过“空间换时间”策略消除局部高阻抗奇点。
+\end{itemize}
+\textbf{决策函数}：计算两种策略的总时间成本，选择效率最高者。
+
+\subsubsection{运动学平滑的进给规划}
+在确定的几何结构基础上，求解最优进给。为了防止因阻抗场波动导致的进给速度剧烈震荡（Bang-Bang Control），引入\textbf{运动学平滑约束}：
+\begin{equation}
+\left| \frac{dF}{dt} \right| \le J_{max}
+\end{equation}
+
+\subsubsection{闭环效应与代码再生}
+优化解算完成后，更新数字孪生体的毛坯模型（Stock Model），并输出包含几何变更（G01 X.. Z..）与进给变更（F..）的新一代 NC 代码，实现从“参数适应”到“工艺结构进化”的跨越。
+
+\section{系统原型实现与自进化性能验证}
+\subsection{实验平台}
+实验平台采用配备开放式数控系统的立式加工中心。系统通过主轴负载电流传感器实时采集功率数据，并通过内部总线与数字孪生模块进行高频通讯。
+
+\begin{figure}[htbp]
+    \centering
+    % [图片占位符] 替换原 \includegraphics 命令
+    \fbox{\parbox[c][5cm]{0.8\textwidth}{\centering \textbf{图 5：实验平台与信号流 (待插入图片)}}}
+    \caption{实验平台与信号流}
+    \label{fig:platform}
+\end{figure}
+
+\subsection{优化环有效性验证：仿真模型的迭代进化}
+实验表明，随着加工层数的增加，系统沉淀的阻抗场知识逐渐精确，赛博空间的仿真预测与物理空间的实测数据之间的误差（Sim-to-Real Gap）逐层收敛。
+
+\subsection{整体框架性能验证}
+通过对比传统恒定参数加工与本文提出的自进化加工策略，结果显示自进化系统有效识别了材料硬点并自动调整了工艺结构，在保证安全的前提下显著提升了加工效率。
+
+\begin{figure}[htbp]
+    \centering
+    % [图片占位符] 替换原 \includegraphics 命令
+    \fbox{\parbox[c][6cm]{0.8\textwidth}{\centering \textbf{图 6：自进化效果验证对比 (待插入图片)}}}
+    \caption{自进化效果验证对比}
+    \label{fig:validation}
+\end{figure}
+
+\section{讨论与结论}
+本文提出了一种基于空间加工阻抗场（SMIF）的数字孪生自进化加工方法。通过建立物理-几何融合的 PIT 表征，并实施双循环控制策略，实现了从被动适应到主动进化的跨越。
+
+实验结果表明，该框架能够有效捕捉加工过程中的物理场变化，并通过闭环反馈实现工艺参数与路径拓扑的自主优化，显著提升了复杂不确定工况下的加工效率与安全性。
+
+%% 参考文献引用 [cite: 631]
+\bibliographystyle{elsarticle-num} 
+\bibliography{refs}
+
+\end{document}
