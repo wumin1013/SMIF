@@ -1,4 +1,4 @@
-This is XeTeX, Version 3.141592653-2.6-0.999997 (TeX Live 2025) (preloaded format=xelatex 2025.12.2)  27 DEC 2025 01:18
+This is XeTeX, Version 3.141592653-2.6-0.999997 (TeX Live 2025) (preloaded format=xelatex 2025.12.2)  27 DEC 2025 01:22
 entering extended mode
  restricted \write18 enabled.
  file:line:error style messages enabled.
@@ -659,90 +659,10 @@ LaTeX Font Info:    Trying to load font information for U+msb on input line 50.
 File: umsb.fd 2013/01/14 v3.01 AMS symbols B
 )
 
-Package natbib Warning: Citation `Monostori2014' on page 1 undefined on input line 53.
-
-
-Package natbib Warning: Citation `Kusiak2018' on page 1 undefined on input line 53.
-
-
-Package natbib Warning: Citation `Liao2017' on page 1 undefined on input line 53.
-
-
-Package natbib Warning: Citation `Grieves2015' on page 1 undefined on input line 53.
-
-
-Package natbib Warning: Citation `Tao2018' on page 1 undefined on input line 53.
-
-
-Package natbib Warning: Citation `Kritzinger2018' on page 1 undefined on input line 53.
-
-
-Package natbib Warning: Citation `Liu2021' on page 1 undefined on input line 53.
-
-
-Package natbib Warning: Citation `Ali2021' on page 1 undefined on input line 53.
-
-
-Package natbib Warning: Citation `Tao2019' on page 1 undefined on input line 53.
-
-
-Package natbib Warning: Citation `Zheng2018' on page 1 undefined on input line 53.
-
-
-Package natbib Warning: Citation `Yusup2012' on page 1 undefined on input line 55.
-
-
-Package natbib Warning: Citation `Teti2010' on page 1 undefined on input line 55.
-
-
-Package natbib Warning: Citation `Kjicai2024' on page 1 undefined on input line 55.
-
-
-Package natbib Warning: Citation `Walker2022' on page 1 undefined on input line 55.
-
-
-
 [1
 
 
 ]
-
-Package natbib Warning: Citation `Melkote2017' on page 2 undefined on input line 57.
-
-
-Package natbib Warning: Citation `Azvar2021' on page 2 undefined on input line 57.
-
-
-Package natbib Warning: Citation `Berger2021' on page 2 undefined on input line 57.
-
-
-Package natbib Warning: Citation `Erkorkmaz2013' on page 2 undefined on input line 57.
-
-
-Package natbib Warning: Citation `Liu2017' on page 2 undefined on input line 57.
-
-
-Package natbib Warning: Citation `Liang2022' on page 2 undefined on input line 57.
-
-
-Package natbib Warning: Citation `Xie2021' on page 2 undefined on input line 57.
-
-
-Package natbib Warning: Citation `Byrne2003' on page 2 undefined on input line 59.
-
-
-Package natbib Warning: Citation `Munoa2016' on page 2 undefined on input line 59.
-
-
-Package natbib Warning: Citation `Altintas2017' on page 2 undefined on input line 59.
-
-
-Package natbib Warning: Citation `Kim2024' on page 2 undefined on input line 59.
-
-
-Package natbib Warning: Citation `Jiang2024' on page 2 undefined on input line 59.
-
-
 
 [2]
 File: ./figures/fig1.pdf Graphic file (type pdf)
@@ -796,16 +716,17 @@ Package hyperref Info: bookmark level for unknown algorithm defaults to 0 on inp
 
 [12]
 
-[13]
-No file 基于空间加工阻抗场重构与双循环时序解耦的数字孪生自进化加工方法.bbl.
-
-Package natbib Warning: There were undefined citations.
-
-
+[13] (./基于空间加工阻抗场重构与双循环时序解耦的数字孪生自进化加工方法.bbl
 
 [14]
 
-[15] (./基于空间加工阻抗场重构与双循环时序解耦的数字孪生自进化加工方法.aux)
+[15]
+
+[16]
+
+[17])
+
+[18] (./基于空间加工阻抗场重构与双循环时序解耦的数字孪生自进化加工方法.aux)
  ***********
 LaTeX2e <2024-11-01> patch level 2
 L3 programming layer <2022/07/14>
@@ -814,12 +735,12 @@ Package rerunfilecheck Info: File `基于空间加工阻抗场重构与双循环
 (rerunfilecheck)             Checksum: DE5F479F997D0E79AC5AFC65BF273AEB;4125.
  ) 
 Here is how much of TeX's memory you used:
- 18535 strings out of 473832
- 396663 string characters out of 5733158
- 807053 words of memory out of 5000000
- 41320 multiletter control sequences out of 15000+600000
+ 18632 strings out of 473832
+ 398948 string characters out of 5733158
+ 808460 words of memory out of 5000000
+ 41414 multiletter control sequences out of 15000+600000
  573468 words of font info for 104 fonts, out of 8000000 for 9000
  1348 hyphenation exceptions out of 8191
- 93i,12n,111p,731b,583s stack positions out of 10000i,1000n,20000p,200000b,200000s
+ 93i,12n,111p,731b,600s stack positions out of 10000i,1000n,20000p,200000b,200000s
 
-Output written on 基于空间加工阻抗场重构与双循环时序解耦的数字孪生自进化加工方法.pdf (15 pages).
+Output written on 基于空间加工阻抗场重构与双循环时序解耦的数字孪生自进化加工方法.pdf (18 pages).
