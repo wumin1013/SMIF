@@ -1,0 +1,386 @@
+\documentclass[preprint,12pt]{elsarticle}
+
+% --- 中文支持 (投稿英文期刊时请删除此行) ---
+\usepackage{ctex}
+% -----------------------------------------
+
+\usepackage{amssymb}
+\usepackage{amsmath}
+\usepackage{graphicx}
+\usepackage{booktabs} % 用于三线表
+\usepackage{geometry}
+\usepackage{hyperref}
+\usepackage{subcaption}
+\usepackage{caption} % 有些elsarticle模板需要显式引入这个
+\usepackage{float}
+
+% --- 算法伪代码 ---
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+% ------------------
+
+% 设置图片路径
+\graphicspath{{./figures/}}
+
+% 设置期刊名称
+\journal{Journal of Manufacturing Systems}
+
+
+\begin{document}
+
+\begin{frontmatter}
+
+\title{基于空间加工阻抗场重构与双循环时序解耦的数字孪生自进化加工方法}
+
+\author[1]{作者姓名}
+\affiliation[1]{organization={某某大学/机构},
+            addressline={某某路},
+            city={某某市},
+            postcode={000000},
+            country={中国}}
+
+\begin{abstract}
+
+\end{abstract}
+
+\begin{keyword}
+数字孪生 \sep 工艺参数自进化 \sep 空间加工阻抗场  \sep 工艺信息表 \sep 双循环时序解耦
+\end{keyword}
+
+\end{frontmatter}
+
+\section{引言}
+在工业4.0与智能制造的浪潮下，制造系统正经历从自动化执行向自主化决策的深刻变革 \cite{Monostori2014, Kusiak2018,Liao2017}。数字孪生（Digital Twin, DT）已成为连接物理空间与赛博空间的关键使能技术\cite{Grieves2015}。 早期的数字孪生研究主要致力于构建高保真的几何与物理模型，以实现对制造过程的可视化监控与离线仿真\cite{Tao2018,Kritzinger2018,Liu2021}。然而，随着制造环境复杂度的提升，仅仅实现“静态映射（Static Mapping）”已不足以支撑系统在不确定性环境下的自主决策能力。理想的智能制造系统应具备类人的“认知”与“进化”特征——即能够通过实时感知数据的反馈，自主更新赛博空间的知识库，并持续迭代优化决策策略\cite{Ali2021}。正如 Tao 等人\cite{Tao2019}和 Zheng 等人\cite{Zheng2018}提出的“认知数字孪生（Cognitive Digital Twin）”概念所述，通过构建“感知-学习-进化”的闭环，赋予数字孪生体自主成长的能力，是当前从“数字制造”迈向“智能制造”的关键方法论。 
+
+在计算机数控（CNC）加工领域，这一自进化方法论的落地显得尤为迫切。作为精密制造的基础环节，CNC加工的效率与质量高度依赖于工艺参数（如进给速度、切削深度、切削宽度、主轴转速）的决策\cite{Yusup2012}。然而，实际加工过程是一个高度动态且非线性的时变物理系统\cite{Teti2010}。刀具磨损的累积、材料微观组织的非均匀性以及机床热变形等因素，导致物理加工状态随时间不断漂移\cite{Kjicai2024}。遗憾的是，当前主流的工艺规划仍主要依赖于手册推荐值或基于理想实验环境建立的静态机理模型（如静态切削力系数）。这种静态模型无法捕捉实际加工中的动态变化，导致赛博空间的仿真预测与物理空间的实际状态之间产生了显著的"Sim-to-Real Gap"\cite{Walker2022}。由于缺乏应对加工动态变化的模型自进化机制，预先优化的工艺参数在加工过程中往往逐渐失效，工艺人员不得不采用保守参数以效率折损换取安全边界，严重限制了高端装备性能的释放。
+
+为了应对工艺优化的挑战，现有的研究主要沿离线规划与在线控制两条路径独立发展，但二者之间存在着难以逾越的“时空错位”。 离线优化（Offline Optimization）试图在加工前解决所有问题。学者们利用解析模型或有限元仿真（FEM）来预测切削力学行为并规划参数。Melkote等\cite{Melkote2017} 基于切削物理和现象学建模预测了切削力与切屑形态。Azvar等\cite{Azvar2021} 通过仿真滚齿过程优化了切削力；Berger等\cite{Berger2021} 则针对钛合金加工优化切屑流动以抑制振动。除了物理仿真，基于几何运动学的速度规划也被广泛研究，Erkorkmaz等\cite{Erkorkmaz2013}和 Liu等\cite{Liu2017} 通过建立刀具-工件啮合模型，在满足捷度（Jerk）和机床动力学约束的前提下生成平滑的B样条速度曲线； Liang等\cite{Liang2022} 利用遗传算法进一步优化了多轴机床的全局时间效率。近年来， Xie等\cite{Xie2021} 更是引入神经网络（ANN）构建数据驱动模型以提升预测精度。然而，所有离线优化的共性缺陷在于“开环（Open-loop）”本质：一旦G代码生成并投入运行，模型便与物理世界断开连接。无论模型多么精密，都无法预知加工中随机发生的刀具磨损、材料硬点或热漂移。这种“预测与现实的静态脱节”，使得离线优化策略随加工时间推移而迅速退化。
+
+为了弥补离线预测的失效，在线自适应控制（Online Adaptive Feedrate Control, AFC）应运而生。Byrne等\cite{Byrne2003} 指出实时响应是应对过程变化的关键。Munoa等\cite{Munoa2016} 综述了通过实时调整主轴转速抑制颤振的技术；Altintas等\cite{Altintas2017} 集成了虚拟仿真与在线监测，通过检测过载实时降低进给率以保护刀具。最新的进展如Kim等\cite{Kim2024}于提出的参考负载控制曲线（RLCC）方法，试图克服传统PID控制的滞后性。然而，现有的在线控制虽然解决了“实时性”问题，却陷入了缺乏长时序视野的困境。绝大多数AFC系统本质上是“被动响应（Reactive）”的——它们主要致力于对瞬时负载偏差的实时抑制，却缺乏对偏差成因的深层认知与推理机制。正如 Jiang等\cite{Jiang2024}在构建智能机床的系统性认知模型时深刻指出，现有系统缺乏持续学习的机制，每一次加工任务结束后，系统对物理环境的认知水平并没有提升。换言之，离线优化有全局视野但无实时反馈，在线控制有实时反馈但无知识积累。
+
+尽管在线自适应控制（AFC）解决了加工过程的实时响应问题，但现有的AFC系统本质上仍是被动响应式（Reactive）的。它们致力于抑制瞬时负载偏差，却缺乏对偏差成因的逆向推理与知识沉淀机制。这导致了赛博空间（模型预测）与物理空间（实际状态）之间存在显著的学习断层（Learning Gap）：物理域的实时数据流未能转化为赛博域的可泛化工艺知识，使得制造系统陷入低水平重复控制的困境，无法实现真正的自主进化。
+
+为建立闭环映射，本文提出了一种基于空间加工阻抗场（Spatial Machining Impedance Field）的数字孪生自进化加工框架。不同于传统方法关注单一维度的材料硬度或几何余量，本框架建立了一种物理-几何耦合的集总阻抗表征。 基于此，我们构建了紧密耦合的双循环机制： 1）执行环：在线应对高频扰动，并将实测负载沉淀为沿路径分布的阻抗知识； 2）优化环：基于全场的阻抗分布图，识别全局加工瓶颈（Global Bottlenecks），引入拓扑一致性约束，对切削层结构（Layer Structure）与运动参数进行全局重构，消除‘几何孤岛’效应，实现工艺系统的自主进化。
+
+本文提出的基于SMIF的双循环自进化框架如图\ref{fig:SMIF-loop} 所示。该框架通过微观执行环与宏观进化环的有机结合，解决了Sim-to-Real Gap，实现工艺自主进化。
+
+\begin{figure}[htbp]
+    \centering
+    % [图片占位符] 替换原 \includegraphics 命令
+    \includegraphics[width=0.9\linewidth]{fig1.pdf}
+    \caption{基于空间加工阻抗场（SMIF）的双循环自进化数字孪生加工框架}
+    \label{fig:SMIF-loop}
+\end{figure}
+
+\noindent\textbf{本文的主要贡献可概括为：}
+\begin{itemize}
+    \item 提出空间加工阻抗场（SMIF）的统一表征，并基于行程域与工艺信息表（PIT）建立可在线更新的物理--几何融合数字孪生模型；
+    \item 提出执行环--进化环的双循环时序解耦框架，使实时AFC的“被动响应”能够沉淀为可泛化的工艺知识，并驱动后续刀路与参数的自主进化；
+    \item 在进化环中提出全局瓶颈驱动的工艺重构策略族（策略A/B），其中策略A的降负载实现采用\textbf{受非均匀阻抗场约束的单调算子优化}以滚动生成自适应层结构。
+\end{itemize}
+
+本文其余章节组织如下：第~2~章给出物理--几何融合的数字孪生建模；第~3~章提出双循环自进化控制方法并给出算法总览；第~4~章给出系统原型实现与实验验证；第~5~章总结讨论并给出未来工作。
+
+
+
+%% [基于 source: 344-381]
+
+\section{统一建模：行程域表征与空间加工阻抗场}
+本章给出方法论所依赖的统一数学表征：以行程域为坐标，将几何啮合与物理负载在同一空间基准中对齐，并将加工过程转化为可学习、可重规划的空间阻抗场。
+
+\subsection{行程域离散化与工艺信息表（PIT）}
+\subsubsection{传统离散化的局限性}
+在加工数字孪生建模中，常见的时域建模与体素建模存在两类缺陷：
+\begin{itemize}
+    \item \textbf{时间域建模}：监测数据 $P(t)$ 强依赖采样频率，产生大量位置重叠冗余，且难以直接映射到工件空间坐标；
+    \item \textbf{体素建模}：计算复杂度随分辨率呈立方增长，难以支撑在线控制与快速重规划。
+\end{itemize}
+
+\subsubsection{稳态区间与PIT结构}
+定义刀具路径总行程长度为 $L$，路径上任意点由标量 $s\in[0,L]$ 唯一确定。将连续路径离散为稳态区间集合 $\{Z_k\}$，在任意区间 $Z_k$ 内，几何啮合参数（切宽 $a_e$、切深 $a_p$）在阈值 $\epsilon$ 下近似恒定。
+
+据此构建\textbf{工艺信息表（PIT）}，用于存储每个稳态区间的几何与物理基准：
+\begin{table}[htbp]
+\centering
+\caption{工艺信息表（PIT）结构示例}
+\label{tab:pit}
+\begin{tabular}{lllll}
+\toprule
+\textbf{索引} & \textbf{行程区间} & \textbf{几何特征} & \textbf{规划进给} & \textbf{阻抗特征} \\
+(Index) & (Stroke Range) & (Geometry) & (Planning) & (Impedance) \\
+\midrule
+Zone\_ID & Start $\sim$ End (s) & $a_e, a_p$ & $F_{plan}$ & $\hat Z$ \\
+\#101 & 10.5 $\sim$ 25.0 & (5.0, 10.0) & 800 mm/min & 2.15 \\
+\#102 & 25.0 $\sim$ 40.0 & (5.0, 10.0) & 600 mm/min & 2.48 \\
+\#103 & 40.0 $\sim$ 80.0 & (8.0, 10.0) & 750 mm/min & 2.18 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+PIT 的关键作用在于：它将“位置（$s$）—几何（$a_p,a_e$）—规划（$F_{plan}$）—物理（$\hat Z$）”统一对齐，使后续算法可以直接在空间域上进行瓶颈定位与参数重构，而无需进行时空转换。
+
+\begin{figure}[htbp]
+    \centering
+    \fbox{\parbox[c][5cm]{0.8\textwidth}{\centering \textbf{行程域离散化与PIT对齐示意（待插图）}}}
+    \caption{物理-几何融合建模与行程域离散化}
+    \label{fig:stroke_domain}
+\end{figure}
+
+\subsection{空间加工阻抗场（SMIF）与功率映射}
+\subsubsection{SMIF定义}
+为实现全局认知，本文将各类不可分辨的工况扰动（材料硬点、余量突增、磨损加剧等）集总为位置相关的等效阻抗 $Z(s)$，并以伪彩图形式构建\textbf{空间加工阻抗场}（SMIF），如图\ref{fig:smif} 所示。
+\begin{figure}[H]
+    \centering
+    \begin{subfigure}[b]{0.8\textwidth}
+        \centering
+        \fbox{\parbox[c][5cm]{\textwidth}{\centering \textbf{(a) 3D Spatial Mapping（待插图）}}}
+        \caption{3D Spatial Mapping}
+        \label{fig:smif_a}
+    \end{subfigure}
+    \par\bigskip
+    \begin{subfigure}[b]{0.48\textwidth}
+        \centering
+        \fbox{\parbox[c][4cm]{\textwidth}{\centering \textbf{(b) Sim-to-Real Gap（待插图）}}}
+        \caption{Sim-to-Real Gap}
+        \label{fig:smif_b}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[b]{0.48\textwidth}
+        \centering
+        \fbox{\parbox[c][4cm]{\textwidth}{\centering \textbf{(c) Bottleneck Identification（待插图）}}}
+        \caption{Bottleneck ID}
+        \label{fig:smif_c}
+    \end{subfigure}
+    \caption{\textbf{空间加工阻抗场（SMIF）的构建与演化。} (a) 基于刀具路径的3D伪彩阻抗映射；(b) 初始静态模型与演化后模型的负载对比，展示 Sim-to-Real Gap 的收敛；(c) 沿行程域展开的阻抗波形与瓶颈识别示意。}
+    \label{fig:smif}
+\end{figure}
+
+\subsubsection{行程域功率方程}
+在行程域中，切削功率被表示为位置 $s$ 处的几何参数与运动参数的耦合结果：
+\begin{equation}
+P(s)=P_{idle}+Z(s)\cdot MRR(s)=P_{idle}+Z(s)\cdot a_p(s)a_e(s)F(s),
+\label{eq:power}
+\end{equation}
+其中 $P_{idle}$ 为空载功率，$F(s)$ 为实际进给速度。
+
+\subsection{优化目标与约束：从离线规划到在线自进化}
+基于式\eqref{eq:power}，加工规划可表述为沿行程域的材料去除效率最大化问题：
+\begin{equation}
+\max J=\int_0^L a_p(s)a_e(s)F(s)\,ds,
+\end{equation}
+并满足功率硬约束
+\begin{equation}
+P_{pred}(s)=P_{idle}+\hat Z(s)\,a_p(s)a_e(s)F(s)\le P_{rated},
+\label{eq:power_constraint}
+\end{equation}
+其中 $\hat Z(s)$ 是对真实阻抗的估计。由于 $Z(s)$ 在加工前未知且随时间漂移，式\eqref{eq:power_constraint}构成一个具有参数不确定性的约束优化问题。
+因此，需要一种能够在加工过程中持续学习 $\hat Z(s)$ 并据此再规划 $(F,a_p,a_e)$ 的闭环机制——这正是下一章双循环时序解耦框架的目标。
+
+\section{方法论：SMIF驱动的双循环时序解耦自进化框架}
+本章给出本文的核心方法：将“实时安全控制”与“层间结构进化”在时间尺度上解耦，并通过PIT/SMIF实现信息闭环。
+
+\subsection{总体框架与欠定性来源}
+在真实加工中，功率异常可能同时来自材料硬化（$Z$增大）、余量偏差（$a_pa_e$有效增大）或磨损/热漂移等因素。
+单次功率观测难以区分这些成因，直接在同一控制层级同时辨识与优化将导致解的不唯一与参数振荡。
+本文通过引入等效阻抗 $Z(s)$ 吸收所有不可分辨扰动：无论成因如何，控制层面均以“空间阻抗突增”统一表征，从而将“物理-几何”二元问题转化为单一维度的\textbf{阻抗场重构}问题，并在层间推进中逐步收敛到真实材料属性。
+
+\subsection{双循环定义：执行环与进化环}
+如图\ref{fig:loops} 所示，本文将系统拆解为两个时间尺度迥异但数据互通的循环：
+\begin{figure}[htbp]
+    \centering
+    \fbox{\parbox[c][6cm]{\textwidth}{\centering \textbf{双循环控制逻辑框图（待插图）}}}
+    \caption{双循环控制逻辑框图：层间执行环（Inter-layer AFC, run-to-run）与进化环（Inter-layer Re-planning）}
+    \label{fig:loops}
+\end{figure}
+
+\begin{enumerate}
+    \item \textbf{执行环（Execution Loop, Inter-layer AFC）}：以层为迭代步的 run-to-run 闭环。首层按基准参数加工（不执行优化），加工过程中在线采样功率/电流并在稳态区间统计均值 $\bar P_{meas,i}$；将 $\bar P_{meas,i}$ 与孪生预测功率 $\bar P_{pred,i}$ 对比，计算下一层的超调倍率 $R_{i,N+1}$（feedrate override），作用于对应区间的进给指令 $F_{cmd}$。该环不追求层内连续调节，而是通过逐层迭代实现负载/功率水平的稳定逼近，并为SMIF更新提供高置信数据。
+    \item \textbf{进化环（Evolutionary Loop, Inter-layer Re-planning）}：层间重规划。输入为上一层（或多层）沉淀的阻抗场 $\hat Z(s)$ 与瓶颈集合 $\Omega_{bottleneck}$，输出为更新后的层结构（$a_p/a_e$）与规划进给 $F_{plan}(s)$，并再生NC代码与PIT。
+\end{enumerate}
+
+为避免概念混乱，本文将“阻抗估计/更新”视为进化环的关键子模块：执行环负责采集，进化环负责沉淀与泛化。
+
+\subsection{执行环：层间超调倍率更新与稳态区间统计}
+执行环通过稳态区间的统计量避免对瞬时噪声过度反应。对第 $N$ 轮加工的稳态区间 $i$，记录预测功率 $P_{pred}$ 与实测功率 $P_{meas}$，并计算区间均值：
+\begin{equation}
+\bar{P}_{meas,i}=\frac{1}{T_{zone}}\int_{t_{in}}^{t_{out}}P_{meas}(t)\,dt,\qquad
+\bar{P}_{pred,i}=\frac{1}{T_{zone}}\int_{t_{in}}^{t_{out}}P_{pred}(t)\,dt.
+\end{equation}
+初始化 $R_{i,1}=1$（首层不执行优化）。对第 $N$ 层加工的稳态区间 $i$，将区间实测均值 $\bar P_{meas,i}$ 与孪生预测均值 $\bar P_{pred,i}$（在相同进给下由模型计算并在区间上取均值）对比，更新下一层的进给超调倍率：
+\begin{equation}
+R_{i,N+1}=R_{i,N}\left(1+\gamma\frac{\bar P_{pred,i}-\bar P_{meas,i}}{\bar P_{pred,i}}\right),
+\end{equation}
+其中 $\gamma$ 为迭代步长。该“run-to-run”更新机制通过逐层修正超调倍率，使实测负载逐步贴近孪生预测（并为后续瓶颈识别与重规划提供一致的数据基准）。
+
+\subsection{阻抗场重构：从实测负载到SMIF知识沉淀}
+进化环首先对执行环采集的数据进行阻抗反解与鲁棒聚合。对区间内采样点 $j$：
+\begin{equation}
+Z_j=\frac{P_j-P_{idle}}{MRR_j}.
+\end{equation}
+为抑制振动、电磁噪声与离群点影响，本文采用中值滤波获得区间代表性阻抗：
+\begin{equation}
+\hat Z_{zone}=\text{Median}\{Z_1,\dots,Z_M\}.
+\end{equation}
+同时，为在增负载/动态切片时避免“估计偏小”导致的过载风险，引入保守上界
+\begin{equation}
+Z_{UCB}=\hat Z_{zone}+\beta\sigma_Z,
+\end{equation}
+其中 $\sigma_Z$ 可由区间采样方差估计，$\beta$ 为置信系数。
+
+\subsection{进化环重规划：瓶颈识别与算子族（策略A/B）}
+\subsubsection{参考功率与区间类型判定}
+由于 $Z(s)$ 缺乏跨机床/跨刀具的统一绝对标准，本文以系统可行性边界构建判据。对稳态区间 $\Omega_m$，由 $\hat Z_m$ 计算区间平均预测功率 $\bar P_{pred,m}$，并定义额定利用系数：
+\begin{equation}
+\kappa_m=\text{clip}\!\left(\frac{\bar P_{pred,m}}{P_{rated}},\,\kappa_{min},\,\kappa_{max}\right),\qquad 
+P_{pref}(s)=\kappa_m P_{rated},\;\; s\in\Omega_m.
+\end{equation}
+进一步定义：
+\begin{align}
+\Omega_{hard}&=\left\{s\;\middle|\;P_{pred}(s,F_{min})>P_{rated}\right\},\\
+\Omega_{soft}&=\left\{s\;\middle|\;P_{pred}(s,F_{min})>P_{pref}(s)\right\},\\
+\Omega_{surplus}&=\left\{s\;\middle|\;P_{pred}(s,F_{max})<P_{pref}(s)\right\},
+\end{align}
+并令 $\Omega_{bottleneck}=\Omega_{hard}\cup\Omega_{soft}$。其中 $\Omega_{hard}$ 表示仅靠降速不可行的绝对瓶颈；$\Omega_{surplus}$ 表示仅靠提速仍无法达到期望利用率的能力冗余区。
+
+\begin{figure}[htbp]
+    \centering
+    \fbox{\parbox[c][5cm]{\textwidth}{\centering \textbf{瓶颈/冗余区间的行程域标注示意（待插图）}}}
+    \caption{全局瓶颈驱动的工艺重构策略示意}
+    \label{fig:replan}
+\end{figure}
+
+\subsubsection{算子族：策略A（全局分层）与策略B（局部重规划）}
+在识别 $\Omega_{bottleneck}$ 与 $\Omega_{surplus}$ 后，进化环在“降负载”与“增负载”两类方向上选择最小代价的可行重构算子。为保持结构清晰，本文将算子族归纳为策略A/B，并扩展为双向形式（$-$：降负载，$+$：增负载）。
+
+\paragraph{策略A：全局分层算子（Global Layering）}
+\begin{itemize}
+    \item \textbf{A$^{-}$}：降低全场切削深度（等效降低 $a_p$、增加层数），适用于\textbf{瓶颈占比高}或连续大范围高阻抗工况，以避免大量局部补丁造成NC结构碎片化；
+    \item \textbf{A$^{+}$（扩展）}：在粗加工/余量允许前提下合并层或提高 $a_p$（不超过 $a_p^{max}$），以提升全局 $MRR$ 并减少 $\Omega_{surplus}$。
+\end{itemize}
+
+\paragraph{策略A的实现：阻抗驱动动态切片（Impedance-driven Dynamic Slicing）}
+针对阻抗沿切深方向剧烈波动（如“硬--软--硬”夹层结构）的复杂工况，本文在策略A中摒弃固定层高规划，将“分几层”的全局问题转化为“下一刀能切多深”的滚动决策。
+每一层加工开始前，系统利用SMIF对当前余量体内的阻抗场进行预测，并在\textbf{非均匀阻抗约束}下求解下一层最大可行切深。
+为强调其本质，本文将该步骤表述为一个\textbf{受非均匀阻抗场约束的单调算子优化问题（Monotonic Operator Optimization under Non-homogeneous Impedance Constraints）}：
+
+令 $d\in[d_{\min},d_{\max}]$ 为候选切深，$\mathcal{V}(d)$ 为该切深对应的待切除余量体子集（随 $d$ 单调扩张）。
+取鲁棒阻抗上界 $\hat Z_{UCB}(\mathbf{x})$，定义切片等效阻抗
+\begin{equation}
+\bar Z(d)=\sup_{\mathbf{x}\in\mathcal{V}(d)} \hat Z_{UCB}(\mathbf{x}),
+\end{equation}
+则在保守进给 $F_{\min}$ 与名义切宽 $a_e$ 下的最坏情形功率上界为
+\begin{equation}
+P^{\max}(d)=P_{idle}+\bar Z(d)\,a_e\,F_{\min}\,d,
+\end{equation}
+并定义单调算子
+\begin{equation}
+\Phi(d)=P^{\max}(d)-P_{rated}.
+\end{equation}
+由 $\mathcal{V}(d_1)\subseteq\mathcal{V}(d_2)$（$d_1<d_2$）可知 $\bar Z(d)$ 单调不减，故 $\Phi(d)$ 关于 $d$ 单调不减。
+于是，下一层切深规划等价于单调约束优化
+\begin{equation}
+d^\star=\arg\max_{d\in[d_{\min},d_{\max}]} d \quad \text{s.t.}\quad \Phi(d)\le 0.
+\end{equation}
+该问题可由\emph{任意}单调算子可行性求解器实现（例如基于可行域迭代收缩的单调可行性算子），其仅依赖于 $\Phi(d)$ 的单调性而不依赖梯度信息。
+据此系统\textbf{仅生成当前层}刀路；层加工完成后更新剩余毛坯模型与阻抗场，再滚动求解下一层 $d^\star$，直至余量切除完毕。
+该逐层滚动（Layer-wise Receding-horizon）机制在无需构造高维全局优化器的前提下，实现硬层“薄切多走”保安全、软层“厚切快走”提效率。
+
+\paragraph{策略B：局部重规划（Local Re-planning）}
+保持全局刀路拓扑尽量不变，仅在局部区间进行可控改动，适用于\textbf{瓶颈/冗余占比低且局部集中}的工况：
+\begin{itemize}
+    \item \textbf{B0：仅进给重规划（Feed-only）}。不改变几何参数，仅在 $F\in[F_{min},F_{max}]$ 内规划进给并施加平滑约束，使系统在不超过 $P_{rated}$ 的前提下尽量跟踪 $P_{pref}$：
+    \begin{equation}
+    F_{plan}(s)=\text{clip}\!\left(\frac{\min\!\left(P_{pref}(s),\,P_{rated}\right)-P_{idle}}{\hat Z(s)a_p(s)a_e(s)},\,F_{min},\,F_{max}\right).
+    \end{equation}
+    \item \textbf{B1$^{-}$：局部多道次降负载（Local multi-pass）}。当 $s\in\Omega_{bottleneck}$ 且B0需要低于 $F_{min}$ 才能满足功率约束时，在瓶颈邻域采用切宽分道（降低 $a_e$）或切深分层（降低 $a_p$）的局部多道次策略，将单位道次 $MRR$ 约化为原来的 $1/n$（本文取 $n=2$），将不可行瓶颈转化为可行规划。
+    \item \textbf{B1$^{+}$（扩展）：局部增负载重规划}。当 $s\in\Omega_{surplus}$ 且已达 $F_{max}$ 仍无法接近 $P_{pref}$ 时，在工艺允许前提下提高局部切宽/步距或减少重复道次以提升局部 $MRR$。
+\end{itemize}
+
+\subsubsection{运动学平滑的进给规划}
+为防止阻抗波动导致的进给剧烈震荡，引入运动学平滑约束：
+\begin{equation}
+\left| \frac{dF}{dt} \right| \le J_{max}.
+\end{equation}
+
+\subsubsection{闭环代码再生与数字孪生更新}
+重规划完成后，更新数字孪生毛坯模型（stock model）与PIT，并输出包含几何变更与进给变更的新一代NC代码，实现从“参数适应”到“工艺结构进化”的闭环跨越。
+
+
+\subsubsection{算法总览：双循环自进化流程与PIT在线更新}
+为便于复现与工程落地，本文将“执行环采集—阻抗场沉淀—瓶颈驱动重规划—代码再生”的全过程归纳为算法\ref{alg:smif_dualloop}。
+值得强调的是，PIT不仅作为静态几何/规划载体，更在\textbf{执行环}与\textbf{进化环}中被分阶段更新：执行环写入区间统计与进给倍率，
+进化环写入鲁棒阻抗与区间标签，并在重规划后同步更新几何参数与规划进给，从而形成闭环一致的数据基准。
+
+\begin{algorithm}[H]
+\footnotesize
+\caption{SMIF驱动的双循环自进化加工（含PIT在线更新）}
+\label{alg:smif_dualloop}
+\begin{algorithmic}[1]
+\Require 初始毛坯模型 $\mathcal{S}_0$；机床约束 $(P_{rated},F_{min},F_{max})$；初始NC与PIT $\mathbf{T}_0$；阻抗先验 $\hat Z_0(\cdot)$
+\Ensure 每层更新的NC与PIT；逐层收敛的阻抗场 $\hat Z(\cdot)$
+\State $\mathcal{S}\gets\mathcal{S}_0$，$\hat Z(\cdot)\gets\hat Z_0(\cdot)$，$\mathbf{T}\gets\mathbf{T}_0$
+\For{层 $k=1,2,\dots$ \textbf{直到}余量切除完毕}
+    \Statex \hspace{-1.2em}\textbf{执行环（ms级）：参考功率跟踪 + 稳态区间统计}
+    \For{PIT中的稳态区间 $\Omega_i$（按行程顺序）}
+        \State 按规划进给执行：$F(t)=R_i\cdot F_{plan,i}$，在线采集功率/电流样本 $\{P_j\}$ 与对应 $MRR_j$
+        \State 计算区间统计量：$\bar P_{meas,i}$、$\sigma_{P,i}$，并按run-to-run规则更新进给倍率 $R_i$
+        \State \textbf{PIT日志更新（执行环）}：$\mathbf{T}[i].\bar P_{meas}\gets\bar P_{meas,i}$，$\mathbf{T}[i].R\gets R_i$
+    \EndFor
+
+    \Statex \hspace{-1.2em}\textbf{进化环（层间）：阻抗场重构 + 瓶颈识别 + 重规划}
+    \For{稳态区间 $\Omega_i$}
+        \State 反解阻抗样本：$Z_j\gets(P_j-P_{idle})/MRR_j$
+        \State 鲁棒聚合：$\hat Z_i\gets \text{Median}(\{Z_j\})$，$Z_{UCB,i}\gets \hat Z_i+\beta\sigma_Z$
+        \State \textbf{PIT知识更新（进化环）}：$\mathbf{T}[i].\hat Z\gets\hat Z_i$，$\mathbf{T}[i].Z_{UCB}\gets Z_{UCB,i}$
+    \EndFor
+    \State 基于 $\{Z_{UCB,i}\}$ 与行程域对齐关系重构SMIF：$\hat Z(\cdot)$
+    \State 识别瓶颈/冗余集合：$\Omega_{hard},\Omega_{soft},\Omega_{surplus}$，并更新区间标签 $\mathbf{T}[i].label$
+    \State 选择最小代价可行算子 $\mathcal{O}_k\in\{\text{A}^{-},\text{A}^{+},\text{B0},\text{B1}^{-},\text{B1}^{+}\}$
+    \If{$\mathcal{O}_k$ 属于策略A（阻抗驱动动态切片）}
+        \State 求解\textbf{单调算子优化}：$d^\star=\arg\max_{d\in[d_{min},d_{max}]} d\ \text{s.t.}\ \Phi(d)\le 0$
+        \State 更新下一层切深：$a_{p,next}\gets d^\star$，并更新毛坯：$\mathcal{S}\gets\mathcal{S}\ominus\mathcal{V}(d^\star)$
+        \State 仅生成\textbf{当前层}刀路与NC；重建PIT：$\mathbf{T}\gets \textsc{BuildPIT}(\text{NC},\mathcal{S})$
+        \State \textbf{PIT规划更新}：写入新层的 $(a_p,a_e,F_{plan})$ 与区间行程范围
+    \Else \Comment{策略B：局部重规划}
+        \State 进给重规划：更新 $F_{plan}(s)$，并施加运动学平滑约束（限加速度/jerk）
+        \State 必要时局部多道次：在瓶颈邻域调整 $(a_p,a_e)$ 或增加道次数
+        \State \textbf{PIT规划更新}：$\mathbf{T}[i].F_{plan}\gets F_{plan,i}$，$\mathbf{T}[i].(a_p,a_e)\gets(a_{p,i},a_{e,i})$
+        \State 输出更新后的NC与PIT，进入下一层
+    \EndIf
+\EndFor
+\end{algorithmic}
+\end{algorithm}
+
+
+\section{系统原型实现与自进化性能验证}
+\subsection{实验平台与信号流}
+实验平台采用配备开放式数控系统的立式加工中心，通过主轴负载电流/功率信号实时采集加工负载，并与数字孪生模块进行高频通讯。
+\begin{figure}[htbp]
+    \centering
+    \fbox{\parbox[c][5cm]{0.8\textwidth}{\centering \textbf{实验平台与信号流（待插图）}}}
+    \caption{实验平台与信号流}
+    \label{fig:platform}
+\end{figure}
+
+\subsection{SMIF演化与Sim-to-Real Gap收敛}
+实验表明，随着加工层数的增加，系统沉淀的阻抗场知识逐渐精确，赛博空间的预测与物理空间的实测误差逐层收敛。
+
+\subsection{整体框架效果验证}
+通过对比恒定参数加工与本文自进化加工策略，结果显示系统可识别材料硬点并自动调整工艺结构，在保证功率硬约束的前提下提升加工效率与稳定性。
+\begin{figure}[htbp]
+    \centering
+    \fbox{\parbox[c][6cm]{0.8\textwidth}{\centering \textbf{自进化效果验证对比（待插图）}}}
+    \caption{自进化效果验证对比}
+    \label{fig:validation}
+\end{figure}
+
+\section{讨论与结论}
+本文提出了一种基于空间加工阻抗场（SMIF）的数字孪生自进化加工方法，通过行程域PIT对齐与双循环时序解耦机制，实现阻抗知识的持续沉淀与瓶颈驱动的工艺结构重构。
+在策略A中，本文进一步将动态分层问题表述为受非均匀阻抗场约束的单调算子优化，从方法论层面统一了“硬层保安全、软层提效率”的滚动切片决策逻辑。
+
+后续工作将进一步引入颤振稳定性、刀具挠度与表面质量等多约束联合建模，并在更复杂几何与多轴工况下验证框架的泛化能力。
+
+\bibliographystyle{elsarticle-num}
+\bibliography{refs}
+
+\end{document}

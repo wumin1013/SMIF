@@ -1,4 +1,4 @@
-import tkinter as tk
+﻿import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 import math
 import re
@@ -53,7 +53,10 @@ matplotlib.rcParams['axes.unicode_minus'] = False    # 解决负号显示问题
 class MillingAnalysisTool:
     def __init__(self, root):
         self.root = root
-        self.root.title("铣削工艺信息分析工具")
+        self.root.title("🔬 铣削工艺信息分析工具 - 智能分析系统")
+        
+        # 配置科技感主题样式
+        self.setup_tech_theme()
         
         # 获取屏幕尺寸并设置自适应窗口大小
         screen_width = self.root.winfo_screenwidth()
@@ -87,6 +90,7 @@ class MillingAnalysisTool:
         self.data = []  # 存储处理后的数据
         self.figures = []  # 存储图表对象
         self.current_figure_index = 0  # 当前显示的图表索引
+        self.figure_names = []  # 图表名称列表
         self.min_length = tk.IntVar(value=100)  # 最小区间长度
         self.batch_min_length = 5  # 添加批量处理专用的点数变量
         self.encoding_var = tk.StringVar(value="auto")  # 文件编码
@@ -100,6 +104,9 @@ class MillingAnalysisTool:
         self.rapid_speed_z = tk.DoubleVar(value=3600.0)    # Z方向快速移动速度
         self.batch_rapid_speed_xy = tk.DoubleVar(value=4800.0)  # 批量处理XY平面快速移动速度
         self.batch_rapid_speed_z = tk.DoubleVar(value=3600.0)    # 批量处理Z方向快速移动速度
+        
+        # 添加防抖动定时器，避免频繁调用resize
+        self._resize_timer = None
         
         # 添加新变量（必须在创建标签页之前定义）
         self.tool_diameter = tk.DoubleVar(value=10.0)  # 刀具直径 (mm)
@@ -433,20 +440,25 @@ class MillingAnalysisTool:
         self.actual_load_figure_frame = ttk.Frame(main_frame)
         self.actual_load_figure_frame.pack(fill=tk.BOTH, expand=True, pady=10)
         
-        # 初始化图表（使用相对大小以自适应容器，提高DPI以增加清晰度）
-        self.fig_actual_load = plt.figure(figsize=(12, 6), dpi=150, tight_layout=False)
+        # 初始化图表（使用更大尺寸和更高DPI以获得更好的显示效果）
+        self.fig_actual_load = plt.figure(figsize=(16, 9), dpi=120, tight_layout=False)
         
-        # 调整子图边距，让图表更好地填充整个区域
+        # 设置白色背景
+        self.fig_actual_load.patch.set_facecolor('white')  # 白色背景
+        
+        # 调整子图边距，让图表居中对称显示
         self.fig_actual_load.subplots_adjust(
-            left=0.08,     # 左边距 - 为y轴标签留出空间
-            bottom=0.10,   # 下边距 - 为x轴标签留出空间
-            right=0.96,    # 右边距 - 为图例留出空间
+            left=0.10,     # 左边距 - 为y轴标签留出空间
+            bottom=0.08,   # 下边距 - 为x轴标签留出空间
+            right=0.90,    # 右边距 - 对称设置
             top=0.94,      # 上边距 - 为标题留出空间
-            wspace=0.15,   # 子图间水平间距
-            hspace=0.15    # 子图间垂直间距
+            wspace=0.12,   # 子图间水平间距
+            hspace=0.12    # 子图间垂直间距
         )
         
         self.ax_actual_load = self.fig_actual_load.add_subplot(111)
+        # 设置坐标系背景为白色
+        self.ax_actual_load.set_facecolor('white')
         
         # 创建画布并确保完全填充父框架
         self.canvas_actual_load = FigureCanvasTkAgg(self.fig_actual_load, master=self.actual_load_figure_frame)
@@ -683,36 +695,55 @@ class MillingAnalysisTool:
     def plot_steady_intervals(self, data_type):
         """绘制稳态区间"""
         self.ax_actual_load.clear()
+        # 设置白色背景
+        self.ax_actual_load.set_facecolor('white')
+        
         # 空值防护
         if (self.actual_load_data is None or self.actual_load_x_positions is None or
                 len(self.actual_load_data) == 0):
-            self.ax_actual_load.text(0.5, 0.5, "无数据可绘制", ha='center', va='center')
+            self.ax_actual_load.text(0.5, 0.5, "无数据可绘制", ha='center', va='center', 
+                                    color='#333333', fontsize=16, fontweight='bold')
             self.canvas_actual_load.draw()
             return
         
-        # 绘制所有数据点 - 使用更美观的颜色和线型
+        # 绘制所有数据点
         self.ax_actual_load.plot(self.actual_load_x_positions, self.actual_load_data,
-                                 '-', color='#1f77b4', linewidth=1.5, label=f'{self.get_data_source_name()}值', alpha=0.8)
+                                 '-', color='#1f77b4', linewidth=2.5, label=f'{self.get_data_source_name()}值', 
+                                 alpha=0.9, zorder=5)
         
         # 如果有滤波数据，也绘制滤波后的数据
         if self.is_filtered and self.filtered_data is not None:
             self.ax_actual_load.plot(self.actual_load_x_positions, self.filtered_data,
-                                     '-', color='#ff7f0e', linewidth=2.0, label='滤波后数据', alpha=0.9)
+                                     '-', color='#ff7f0e', linewidth=3.0, label='滤波后数据', 
+                                     alpha=0.95, zorder=6)
         
-        # 标记稳态区间 - 使用更柔和的配色
+        # 标记稳态区间 - 使用清晰的配色
         if self.actual_load_intervals:
+            # 使用淡色背景区分区间
+            interval_colors = [
+                '#ffcccc',  # 淡红
+                '#ccffcc',  # 淡绿
+                '#ccccff',  # 淡蓝
+                '#ffffcc',  # 淡黄
+                '#ffccff',  # 淡紫
+                '#ccffff',  # 淡青
+                '#ffddcc',  # 淡橙
+                '#ddffcc',  # 淡草绿
+            ]
             for idx, (start_idx, end_idx) in enumerate(self.actual_load_intervals):
                 if start_idx < 0 or end_idx >= len(self.actual_load_x_positions):
                     continue
                 start_x = self.actual_load_x_positions[start_idx]
                 end_x = self.actual_load_x_positions[end_idx]
-                # 使用更美观的绿色系
-                self.ax_actual_load.axvspan(start_x, end_x, alpha=0.25, color='#2ecc71', 
-                                           edgecolor='#27ae60', linewidth=1.5)
+                color = interval_colors[idx % len(interval_colors)]
+                self.ax_actual_load.axvspan(start_x, end_x, alpha=0.5, color=color, 
+                                           edgecolor='black', linewidth=1.5, zorder=1)
                 
-                # 添加更清晰的纵向边界线
-                self.ax_actual_load.axvline(x=start_x, color='#34495e', linewidth=1.0, alpha=0.7, linestyle='--')
-                self.ax_actual_load.axvline(x=end_x, color='#34495e', linewidth=1.0, alpha=0.7, linestyle='--')
+                # 添加边界线
+                self.ax_actual_load.axvline(x=start_x, color='red', linewidth=2.0, alpha=0.7, 
+                                           linestyle='--', zorder=4)
+                self.ax_actual_load.axvline(x=end_x, color='red', linewidth=2.0, alpha=0.7, 
+                                           linestyle='--', zorder=4)
         
         # 重新绘制分割线（确保它们在所有操作后保持显示）
         self.redraw_segment_lines()
@@ -722,9 +753,9 @@ class MillingAnalysisTool:
             absolute_threshold = self.absolute_threshold.get()
             if absolute_threshold > 0:
                 # 画一条红色虚线表示绝对阈值
-                self.ax_actual_load.axhline(y=absolute_threshold, color='red', linestyle='--', 
-                                          linewidth=2, alpha=0.8, 
-                                          label=f'绝对阈值 ({absolute_threshold})')
+                self.ax_actual_load.axhline(y=absolute_threshold, color='#d62728', linestyle='--', 
+                                          linewidth=2.5, alpha=0.9, 
+                                          label=f'绝对阈值 ({absolute_threshold})', zorder=3)
         except:
             pass  # 如果获取阈值失败，不影响其他绘制
         
@@ -740,43 +771,65 @@ class MillingAnalysisTool:
             title = f'华中模块功率稳态区间 ({data_type}数据)'
             ylabel = '功率'
         
-        # 设置标题和标签 - 使用更大更清晰的字体
-        self.ax_actual_load.set_title(title, fontsize=14, fontweight='bold', pad=15)
-        self.ax_actual_load.set_xlabel('程序行号位置', fontsize=11, fontweight='bold')
-        self.ax_actual_load.set_ylabel(ylabel, fontsize=11, fontweight='bold')
+        # 设置标题和标签
+        self.ax_actual_load.set_title(title, fontsize=18, fontweight='bold', pad=15, 
+                                     color='#333333')
+        self.ax_actual_load.set_xlabel('程序行号位置', fontsize=14, fontweight='bold', 
+                                      color='#333333')
+        self.ax_actual_load.set_ylabel(ylabel, fontsize=14, fontweight='bold', 
+                                      color='#333333')
         
         # 设置横轴刻度标签
         unique_line_numbers = self.actual_load_unique_line_numbers
         if len(unique_line_numbers) == 1:
             n = unique_line_numbers[0]
             self.ax_actual_load.set_xticks([n, n+0.5, n+1])
-            self.ax_actual_load.set_xticklabels([f"{n:.0f}", f"{n+0.5:.1f}", f"{n+1:.0f}"], fontsize=9)
+            self.ax_actual_load.set_xticklabels([f"{n:.0f}", f"{n+0.5:.1f}", f"{n+1:.0f}"], 
+                                               fontsize=12, color='#333333')
         elif len(unique_line_numbers) > 20:
             step = max(1, len(unique_line_numbers) // 10)
             tick_positions = range(0, len(unique_line_numbers), step)
             tick_labels = [str(unique_line_numbers[i]) for i in tick_positions]
             self.ax_actual_load.set_xticks(tick_positions)
-            self.ax_actual_load.set_xticklabels(tick_labels, rotation=45, ha='right', fontsize=9)
+            self.ax_actual_load.set_xticklabels(tick_labels, rotation=45, ha='right', 
+                                               fontsize=12, color='#333333')
         else:
             self.ax_actual_load.set_xticks(range(len(unique_line_numbers)))
-            self.ax_actual_load.set_xticklabels([str(ln) for ln in unique_line_numbers], rotation=45, ha='right', fontsize=9)
+            self.ax_actual_load.set_xticklabels([str(ln) for ln in unique_line_numbers], 
+                                               rotation=45, ha='right', fontsize=12, color='#333333')
         
-        # 设置y轴刻度标签字体大小
-        self.ax_actual_load.tick_params(axis='y', labelsize=9)
+        # 设置y轴刻度标签字体大小和颜色
+        self.ax_actual_load.tick_params(axis='y', labelsize=12, colors='#333333')
+        self.ax_actual_load.tick_params(axis='x', colors='#333333')
         
         # 重新绘制分割线（确保它们在所有操作后保持显示）
         self.redraw_segment_lines()
         
-        # 使用更美观的网格样式
-        self.ax_actual_load.grid(True, linestyle=':', alpha=0.4, linewidth=0.8, color='gray')
+        # 限制纵向高度不超过数据最高的1.2倍
+        self.cap_y_axis(self.ax_actual_load, [self.actual_load_data, self.filtered_data])
+        
+        # 设置网格样式
+        self.ax_actual_load.grid(True, linestyle=':', alpha=0.3, linewidth=0.5, 
+                                color='gray', zorder=0)
+        
+        # 设置坐标轴边框颜色
+        for spine in self.ax_actual_load.spines.values():
+            spine.set_edgecolor('#333333')
+            spine.set_linewidth(1.5)
         
         # 优化图例位置和样式
-        self.ax_actual_load.legend(loc='upper right', fontsize=9, framealpha=0.9, shadow=True)
+        legend = self.ax_actual_load.legend(loc='upper right', fontsize=12, framealpha=0.9, 
+                                           shadow=True, fancybox=True)
+        legend.get_frame().set_facecolor('white')
+        legend.get_frame().set_edgecolor('#333333')
+        legend.get_frame().set_linewidth(1.5)
+        for text in legend.get_texts():
+            text.set_color('#333333')
         
-        # 优化布局以充分利用图表区域
+        # 优化布局以居中对称
         self.fig_actual_load.subplots_adjust(
-            left=0.08, bottom=0.10, right=0.96, top=0.94,
-            wspace=0.15, hspace=0.15
+            left=0.10, bottom=0.08, right=0.90, top=0.94,
+            wspace=0.12, hspace=0.12
         )
         
         self.canvas_actual_load.draw()
@@ -784,11 +837,14 @@ class MillingAnalysisTool:
     def plot_single_segment_analysis(self, segment_index, intervals, data_type):
         """绘制单个分段的分析结果，高亮显示当前分析的分段"""
         self.ax_actual_load.clear()
+        # 应用科技感主题
+        self.apply_tech_theme_to_axes(self.ax_actual_load)
         
         # 空值防护
         if (self.actual_load_data is None or self.actual_load_x_positions is None or
                 len(self.actual_load_data) == 0):
-            self.ax_actual_load.text(0.5, 0.5, "无数据可绘制", ha='center', va='center')
+            self.ax_actual_load.text(0.5, 0.5, "无数据可绘制", ha='center', va='center',
+                                    color='#00ff41', fontsize=16, fontweight='bold')
             self.canvas_actual_load.draw()
             return
         
@@ -814,8 +870,8 @@ class MillingAnalysisTool:
                 self.ax_actual_load.plot(
                     self.actual_load_x_positions[start_idx:end_idx], 
                     self.actual_load_data[start_idx:end_idx],
-                    '-', color='#1f77b4', linewidth=2.5, alpha=1.0, 
-                    label=f'分段{i+1}(当前分析)'
+                    '-', color='#00d4ff', linewidth=3.0, alpha=1.0, 
+                    label=f'分段{i+1}(当前分析)', zorder=5
                 )
                 
                 # 如果有滤波数据，也高亮显示
@@ -823,37 +879,44 @@ class MillingAnalysisTool:
                     self.ax_actual_load.plot(
                         self.actual_load_x_positions[start_idx:end_idx], 
                         self.filtered_data[start_idx:end_idx],
-                        '-', color='#ff7f0e', linewidth=2.5, alpha=1.0, 
-                        label=f'分段{i+1}滤波后(当前分析)'
+                        '-', color='#ff00ff', linewidth=3.0, alpha=1.0, 
+                        label=f'分段{i+1}滤波后(当前分析)', zorder=6
                     )
             else:
                 # 其他分段，使用较淡的显示
                 self.ax_actual_load.plot(
                     self.actual_load_x_positions[start_idx:end_idx], 
                     self.actual_load_data[start_idx:end_idx],
-                    '-', color='#95a5a6', linewidth=1.0, alpha=0.5
+                    '-', color='#556677', linewidth=1.2, alpha=0.4, zorder=2
                 )
         
-        # 标记当前分段的稳态区间
+        # 标记当前分段的稳态区间 - 使用高对比度霓虹色
         if intervals:
-            for start_idx, end_idx in intervals:
+            interval_colors = [
+                '#00ff41', '#ff3366', '#ffff00', '#00ffff', 
+                '#ff9500', '#9d00ff', '#00ff9d', '#ff006e',
+            ]
+            for idx, (start_idx, end_idx) in enumerate(intervals):
                 if start_idx < 0 or end_idx >= len(self.actual_load_x_positions):
                     continue
                 start_x = self.actual_load_x_positions[start_idx]
                 end_x = self.actual_load_x_positions[end_idx]
-                self.ax_actual_load.axvspan(start_x, end_x, alpha=0.25, color='#2ecc71', 
-                                          edgecolor='#27ae60', linewidth=1.5,
-                                          label='稳态区间' if start_idx == intervals[0][0] else "")
+                color = interval_colors[idx % len(interval_colors)]
+                self.ax_actual_load.axvspan(start_x, end_x, alpha=0.18, color=color, 
+                                          edgecolor=color, linewidth=2.0, zorder=1,
+                                          label='稳态区间' if idx == 0 else "")
                 
-                # 添加更清晰的纵向边界线
-                self.ax_actual_load.axvline(x=start_x, color='#34495e', linewidth=1.0, alpha=0.7, linestyle='--')
-                self.ax_actual_load.axvline(x=end_x, color='#34495e', linewidth=1.0, alpha=0.7, linestyle='--')
+                # 添加更清晰明亮的纵向边界线
+                self.ax_actual_load.axvline(x=start_x, color=color, linewidth=2.5, alpha=0.9, 
+                                           linestyle='--', zorder=4)
+                self.ax_actual_load.axvline(x=end_x, color=color, linewidth=2.5, alpha=0.9, 
+                                           linestyle='--', zorder=4)
         
         # 高亮当前分析的分段范围
         seg_start_x = self.actual_load_x_positions[current_segment['start_idx']]
         seg_end_x = self.actual_load_x_positions[current_segment['end_idx']-1]
-        self.ax_actual_load.axvspan(seg_start_x, seg_end_x, alpha=0.3, color='yellow', 
-                                  edgecolor='orange', linewidth=1.0,
+        self.ax_actual_load.axvspan(seg_start_x, seg_end_x, alpha=0.15, color='#ffff00', 
+                                  edgecolor='#ff9500', linewidth=2.0, zorder=0,
                                   label=f'分段{segment_index+1}范围')
         
         # 重新绘制分割线
@@ -871,9 +934,9 @@ class MillingAnalysisTool:
             title = f'分段{segment_index+1}华中模块功率稳态区间分析'
             ylabel = '功率'
         
-        self.ax_actual_load.set_title(title, fontsize=14, fontweight='bold', pad=15)
-        self.ax_actual_load.set_xlabel('程序行号位置', fontsize=11, fontweight='bold')
-        self.ax_actual_load.set_ylabel(ylabel, fontsize=11, fontweight='bold')
+        self.ax_actual_load.set_title(title, fontsize=20, fontweight='bold', pad=20, color='#00ff41')
+        self.ax_actual_load.set_xlabel('程序行号位置', fontsize=15, fontweight='bold', color='#00d4ff')
+        self.ax_actual_load.set_ylabel(ylabel, fontsize=15, fontweight='bold', color='#00d4ff')
         
         # 设置横轴刻度标签
         unique_line_numbers = self.actual_load_unique_line_numbers
@@ -884,27 +947,44 @@ class MillingAnalysisTool:
         elif len(unique_line_numbers) > 20:
             step = max(1, len(unique_line_numbers) // 10)
             tick_positions = range(0, len(unique_line_numbers), step)
+        # 设置横轴刻度标签 - 应用科技感样式（注意这是在单个分段分析函数中）
+        unique_line_numbers = self.actual_load_unique_line_numbers
+        if len(unique_line_numbers) == 1:
+            n = unique_line_numbers[0]
+            self.ax_actual_load.set_xticks([n, n+0.5, n+1])
+            self.ax_actual_load.set_xticklabels([f"{n:.0f}", f"{n+0.5:.1f}", f"{n+1:.0f}"], 
+                                               fontsize=13, color='#aabbcc')
+        elif len(unique_line_numbers) > 20:
+            step = max(1, len(unique_line_numbers) // 10)
+            tick_positions = range(0, len(unique_line_numbers), step)
             tick_labels = [str(unique_line_numbers[i]) for i in tick_positions]
             self.ax_actual_load.set_xticks(tick_positions)
-            self.ax_actual_load.set_xticklabels(tick_labels, rotation=45, ha='right', fontsize=9)
+            self.ax_actual_load.set_xticklabels(tick_labels, rotation=45, ha='right', 
+                                               fontsize=13, color='#aabbcc')
         else:
             self.ax_actual_load.set_xticks(range(len(unique_line_numbers)))
-            self.ax_actual_load.set_xticklabels([str(ln) for ln in unique_line_numbers], rotation=45, ha='right', fontsize=9)
+            self.ax_actual_load.set_xticklabels([str(ln) for ln in unique_line_numbers], 
+                                               rotation=45, ha='right', fontsize=13, color='#aabbcc')
         
-        # 设置y轴刻度标签字体大小
-        self.ax_actual_load.tick_params(axis='y', labelsize=9)
+        # 限制纵向高度不超过数据最高的1.2倍
+        self.cap_y_axis(self.ax_actual_load, [self.actual_load_data, self.filtered_data])
         
-        self.ax_actual_load.grid(True, linestyle=':', alpha=0.4, linewidth=0.8, color='gray')
-        
-        # 去重图例
+        # 去重图例并应用科技感样式
         handles, labels = self.ax_actual_load.get_legend_handles_labels()
         by_label = dict(zip(labels, handles))
-        self.ax_actual_load.legend(by_label.values(), by_label.keys(), loc='upper right', fontsize=9, framealpha=0.9, shadow=True)
+        legend = self.ax_actual_load.legend(by_label.values(), by_label.keys(), 
+                                           loc='upper right', fontsize=13, framealpha=0.85, 
+                                           shadow=True, fancybox=True)
+        legend.get_frame().set_facecolor('#0a0e27')
+        legend.get_frame().set_edgecolor('#00d4ff')
+        legend.get_frame().set_linewidth(2)
+        for text in legend.get_texts():
+            text.set_color('#ffffff')
         
         # 优化布局以充分利用图表区域
         self.fig_actual_load.subplots_adjust(
-            left=0.08, bottom=0.10, right=0.96, top=0.94,
-            wspace=0.15, hspace=0.15
+            left=0.07, bottom=0.08, right=0.98, top=0.95,
+            wspace=0.12, hspace=0.12
         )
         
         self.canvas_actual_load.draw()
@@ -912,26 +992,37 @@ class MillingAnalysisTool:
     def plot_merged_segments_analysis(self, data_type):
         """绘制所有分段的合并分析结果，只显示稳态区间边界线"""
         self.ax_actual_load.clear()
+        # 应用科技感主题
+        self.apply_tech_theme_to_axes(self.ax_actual_load)
         
         # 空值防护
         if (self.actual_load_data is None or self.actual_load_x_positions is None or
                 len(self.actual_load_data) == 0):
-            self.ax_actual_load.text(0.5, 0.5, "无数据可绘制", ha='center', va='center')
+            self.ax_actual_load.text(0.5, 0.5, "无数据可绘制", ha='center', va='center',
+                                    color='#00ff41', fontsize=16, fontweight='bold')
             self.canvas_actual_load.draw()
             return
         
-        # 绘制全部数据点 - 使用更美观的配色
+        # 绘制全部数据点 - 使用科技感霓虹配色
         self.ax_actual_load.plot(self.actual_load_x_positions, self.actual_load_data,
-                                 '-', color='#1f77b4', linewidth=1.5, alpha=0.8, label=f'{self.get_data_source_name()}值')
+                                 '-', color='#00d4ff', linewidth=2.5, alpha=0.9, 
+                                 label=f'{self.get_data_source_name()}值', zorder=5)
         
         # 如果有滤波数据，也绘制滤波后的数据
         if self.is_filtered and self.filtered_data is not None:
             self.ax_actual_load.plot(self.actual_load_x_positions, self.filtered_data,
-                                     '-', color='#ff7f0e', linewidth=2.0, alpha=0.9, label='滤波后数据')
+                                     '-', color='#ff00ff', linewidth=3.0, alpha=0.95, 
+                                     label='滤波后数据', zorder=6)
         
         # 绘制所有分段的稳态区间高亮背景和边界线
         legend_added = set()  # 避免重复的图例
         
+        # 使用高对比度霓虹配色
+        interval_colors = [
+            '#00ff41', '#ff3366', '#ffff00', '#00ffff', 
+            '#ff9500', '#9d00ff', '#00ff9d', '#ff006e',
+        ]
+        interval_idx = 0
         for i, segment in enumerate(self.segments):
             # 绘制该分段的稳态区间
             if 'intervals' in segment and segment['intervals']:
@@ -941,27 +1032,29 @@ class MillingAnalysisTool:
                     start_x = self.actual_load_x_positions[start_interval]
                     end_x = self.actual_load_x_positions[end_interval]
                     
-                    # 绘制稳态区间的绿色背景高亮 - 使用更美观的颜色
-                    self.ax_actual_load.axvspan(start_x, end_x, alpha=0.25, color='#2ecc71',
-                                              edgecolor='#27ae60', linewidth=1.5,
+                    color = interval_colors[interval_idx % len(interval_colors)]
+                    interval_idx += 1
+                    # 绘制稳态区间的背景高亮
+                    self.ax_actual_load.axvspan(start_x, end_x, alpha=0.18, color=color,
+                                              edgecolor=color, linewidth=2.0, zorder=1,
                                               label='稳态区间' if '稳态区间' not in legend_added else "")
                     legend_added.add('稳态区间')
                     
-                    # 绘制纵向边界线 - 使用虚线样式
+                    # 绘制纵向边界线 - 使用霓虹虚线样式
                     # 起始边界线
-                    self.ax_actual_load.axvline(x=start_x, color='#34495e', linestyle='--', 
-                                              linewidth=1.0, alpha=0.7,
+                    self.ax_actual_load.axvline(x=start_x, color=color, linestyle='--', 
+                                              linewidth=2.5, alpha=0.9, zorder=4,
                                               label='稳态区间边界' if '稳态区间边界' not in legend_added else "")
                     
                     # 结束边界线
-                    self.ax_actual_load.axvline(x=end_x, color='#34495e', linestyle='--', 
-                                              linewidth=1.0, alpha=0.7)
+                    self.ax_actual_load.axvline(x=end_x, color=color, linestyle='--', 
+                                              linewidth=2.5, alpha=0.9, zorder=4)
                     legend_added.add('稳态区间边界')
         
         # 重新绘制分割线
         self.redraw_segment_lines()
         
-        # 设置标题和标签
+        # 设置标题和标签 - 科技感样式
         data_source = self.data_source_var.get()
         if data_source == "current":
             title = f'所有分段负载电流稳态区间合并分析'
@@ -973,44 +1066,72 @@ class MillingAnalysisTool:
             title = f'所有分段华中模块功率稳态区间合并分析'
             ylabel = '功率'
         
-        self.ax_actual_load.set_title(title, fontsize=14, fontweight='bold', pad=15)
-        self.ax_actual_load.set_xlabel('程序行号位置', fontsize=11, fontweight='bold')
-        self.ax_actual_load.set_ylabel(ylabel, fontsize=11, fontweight='bold')
+        self.ax_actual_load.set_title(title, fontsize=20, fontweight='bold', pad=20, color='#00ff41')
+        self.ax_actual_load.set_xlabel('程序行号位置', fontsize=15, fontweight='bold', color='#00d4ff')
+        self.ax_actual_load.set_ylabel(ylabel, fontsize=15, fontweight='bold', color='#00d4ff')
         
-        # 设置横轴刻度标签
+        # 设置横轴刻度标签 - 科技感样式
         unique_line_numbers = self.actual_load_unique_line_numbers
         if len(unique_line_numbers) == 1:
             n = unique_line_numbers[0]
             self.ax_actual_load.set_xticks([n, n+0.5, n+1])
-            self.ax_actual_load.set_xticklabels([f"{n:.0f}", f"{n+0.5:.1f}", f"{n+1:.0f}"], fontsize=9)
+            self.ax_actual_load.set_xticklabels([f"{n:.0f}", f"{n+0.5:.1f}", f"{n+1:.0f}"], 
+                                               fontsize=13, color='#aabbcc')
         elif len(unique_line_numbers) > 20:
             step = max(1, len(unique_line_numbers) // 10)
             tick_positions = range(0, len(unique_line_numbers), step)
             tick_labels = [str(unique_line_numbers[i]) for i in tick_positions]
             self.ax_actual_load.set_xticks(tick_positions)
-            self.ax_actual_load.set_xticklabels(tick_labels, rotation=45, ha='right', fontsize=9)
+            self.ax_actual_load.set_xticklabels(tick_labels, rotation=45, ha='right', 
+                                               fontsize=13, color='#aabbcc')
         else:
             self.ax_actual_load.set_xticks(range(len(unique_line_numbers)))
-            self.ax_actual_load.set_xticklabels([str(ln) for ln in unique_line_numbers], rotation=45, ha='right', fontsize=9)
+            self.ax_actual_load.set_xticklabels([str(ln) for ln in unique_line_numbers], 
+                                               rotation=45, ha='right', fontsize=13, color='#aabbcc')
         
-        # 设置y轴刻度标签字体大小
-        self.ax_actual_load.tick_params(axis='y', labelsize=9)
+        # 限制纵向高度不超过数据最高的1.2倍
+        self.cap_y_axis(self.ax_actual_load, [self.actual_load_data, self.filtered_data])
         
-        self.ax_actual_load.grid(True, linestyle=':', alpha=0.4, linewidth=0.8, color='gray')
-        
-        # 整理图例，避免重复
+        # 整理图例，避免重复 - 科技感样式
         handles, labels = self.ax_actual_load.get_legend_handles_labels()
         by_label = dict(zip(labels, handles))
-        self.ax_actual_load.legend(by_label.values(), by_label.keys(), 
-                                  loc='upper right', fontsize=9, framealpha=0.9, shadow=True)
+        legend = self.ax_actual_load.legend(by_label.values(), by_label.keys(), 
+                                           loc='upper right', fontsize=13, framealpha=0.85, 
+                                           shadow=True, fancybox=True)
+        legend.get_frame().set_facecolor('#0a0e27')
+        legend.get_frame().set_edgecolor('#00d4ff')
+        legend.get_frame().set_linewidth(2)
+        for text in legend.get_texts():
+            text.set_color('#ffffff')
         
         # 优化布局以充分利用图表区域
         self.fig_actual_load.subplots_adjust(
-            left=0.08, bottom=0.10, right=0.96, top=0.94,
-            wspace=0.15, hspace=0.15
+            left=0.07, bottom=0.08, right=0.98, top=0.95,
+            wspace=0.12, hspace=0.12
         )
         
         self.canvas_actual_load.draw()
+
+    def cap_y_axis(self, ax, data_arrays):
+        """限制纵向高度不超过数据最高的1.2倍"""
+        y_max = None
+        y_min = None
+        for data in data_arrays:
+            if data is None:
+                continue
+            data_array = np.asarray(data, dtype=float)
+            if data_array.size == 0:
+                continue
+            line_max = np.nanmax(data_array)
+            line_min = np.nanmin(data_array)
+            y_max = line_max if y_max is None else max(y_max, line_max)
+            y_min = line_min if y_min is None else min(y_min, line_min)
+        if y_max is not None and y_max > 0:
+            y_upper = y_max * 1.2
+            y_lower = y_min if y_min is not None else 0.0
+            if y_lower >= y_upper:
+                y_lower = y_upper * 0.8
+            ax.set_ylim(y_lower, y_upper)
 
     def redraw_segment_lines(self):
         """重新绘制分割线，确保它们在图表操作后保持显示"""
@@ -1653,39 +1774,59 @@ class MillingAnalysisTool:
         matplotlib.rcParams['agg.path.chunksize'] = 10000
     
     def init_figures(self):
-        """初始化图表"""
-        # 根据窗口大小计算图表尺寸
+        """初始化图表 - 科技感深色主题，自适应全屏显示"""
+        # 获取实际窗口大小
+        self.root.update_idletasks()  # 确保获取最新的窗口大小
         window_width = self.root.winfo_width()
         window_height = self.root.winfo_height()
         
-        # 计算适合的图表尺寸（基于窗口大小，但设置合理的最小和最大值）
-        fig_width = max(6, min(12, window_width * 0.006))  # 最小6英寸，最大12英寸
-        fig_height = max(4, min(8, window_height * 0.004))  # 最小4英寸，最大8英寸
+        # 计算图表尺寸 - 更大的尺寸确保内容完整显示
+        # 使用更激进的比例以充分利用空间
+        fig_width = max(14, window_width * 0.012)  # 增大到14英寸起步
+        fig_height = max(8, window_height * 0.008)  # 增大到8英寸起步
         
-        # 数据处理标签页的图表 - 使用更高DPI和更好的默认配置
-        self.fig_data, self.ax_data = plt.subplots(figsize=(fig_width, fig_height), dpi=150)
-        # 设置子图边距确保标签完整显示
-        self.fig_data.subplots_adjust(left=0.1, right=0.95, top=0.92, bottom=0.1)
+        # 数据处理标签页的图表 - 科技感深色主题
+        self.fig_data, self.ax_data = plt.subplots(figsize=(fig_width, fig_height), dpi=100)
+        
+        # 设置白色背景
+        self.fig_data.patch.set_facecolor('white')
+        self.ax_data.set_facecolor('white')
+        
+        # 优化子图边距以居中对称显示，数据占2/3以上
+        self.fig_data.subplots_adjust(left=0.10, right=0.90, top=0.94, bottom=0.08)
+        
+        # 创建画布
         self.canvas_data = FigureCanvasTkAgg(self.fig_data, master=self.data_figure_frame)
         canvas_widget = self.canvas_data.get_tk_widget()
-        canvas_widget.pack(fill=tk.BOTH, expand=True)
-        canvas_widget.configure(relief=tk.FLAT, bd=0)  # 移除边框以获得更清爽的外观
+        canvas_widget.pack(fill=tk.BOTH, expand=True, padx=0, pady=0)
+        canvas_widget.configure(relief=tk.FLAT, bd=0)
+        
+        # 为数据处理图表添加鼠标滚轮横向缩放功能
+        self.canvas_data.mpl_connect('scroll_event', self.on_data_scroll_zoom)
         
         # 显示初始提示
         self.show_initial_message()
     
     def show_initial_message(self):
         """显示初始提示信息"""
-        # 数据处理标签页 - 使用更美观的提示样式
         self.ax_data.clear()
-        self.ax_data.text(0.5, 0.5, '请选择txt文件并点击"一键处理"', 
-                         horizontalalignment='center', 
-                         verticalalignment='center',
-                         fontsize=16,
-                         fontweight='bold',
-                         color='#7f8c8d')
+        self.ax_data.set_facecolor('white')
+        self.ax_data.set_xlim(0, 1)
+        self.ax_data.set_ylim(0, 1)
+        self.ax_data.text(
+            0.5,
+            0.5,
+            '请选择txt文件并点击"一键处理"',
+            horizontalalignment='center',
+            verticalalignment='center',
+            transform=self.ax_data.transAxes,
+            fontsize=20,
+            fontweight='bold',
+            color='#333333'
+        )
+        self.ax_data.set_anchor('C')
         self.ax_data.axis('off')
-        self.canvas_data.draw()
+        self.canvas_data.draw_idle()
         
     def create_data_processing_tab(self):
         """创建工艺信息提取标签页界面"""
@@ -1722,10 +1863,20 @@ class MillingAnalysisTool:
         # 自适应画布窗口大小
         def configure_scroll_region(event=None):
             canvas.configure(scrollregion=canvas.bbox("all"))
+
             canvas_width = canvas.winfo_width()
             req_width = scrollable_frame.winfo_reqwidth()
             if canvas_width > req_width:
                 canvas.itemconfig(canvas_window, width=canvas_width)
+
+            # ✅ 关键：把高度也撑到窗口高度（只有在"窗口更高"时才撑开）
+            canvas_height = canvas.winfo_height()
+            req_height = scrollable_frame.winfo_reqheight()
+            if canvas_height > req_height:
+                canvas.itemconfig(canvas_window, height=canvas_height)
+
+            # 让图表尺寸调整在布局更新后执行
+            self.root.after_idle(self.adjust_figure_sizes)
         
         canvas.bind('<Configure>', configure_scroll_region)
         scrollable_frame.bind('<Configure>', configure_scroll_region)
@@ -1766,22 +1917,26 @@ class MillingAnalysisTool:
         # 主框架 - 保持原有的布局风格
         main_frame = ttk.Frame(scrollable_frame, padding="10")
         main_frame.pack(fill=tk.BOTH, expand=True)
+        # 关键：配置列权重，让第一列占满水平空间
+        main_frame.columnconfigure(0, weight=1)
         
-        # 输入文件选择
-        input_frame = ttk.LabelFrame(main_frame, text="输入设置", padding="10")
-        input_frame.pack(fill=tk.X, pady=5)
+        # 输入文件选择 - 使用科技感样式
+        input_frame = ttk.LabelFrame(main_frame, text="📁 输入设置", padding="15", style='Tech.TLabelframe')
+        input_frame.pack(fill=tk.X, pady=8)
         
-        ttk.Label(input_frame, text="输入文件:").grid(row=0, column=0, sticky=tk.W)
-        data_file_entry = ttk.Entry(input_frame, textvariable=self.input_file_path)
-        data_file_entry.grid(row=0, column=1, padx=5, sticky=tk.EW)  # 使用sticky=EW自适应宽度
-        ttk.Button(input_frame, text="浏览...", command=self.browse_input_file).grid(row=0, column=2)
+        ttk.Label(input_frame, text="输入文件:", font=('Microsoft YaHei UI', 10)).grid(row=0, column=0, sticky=tk.W)
+        data_file_entry = ttk.Entry(input_frame, textvariable=self.input_file_path, font=('Consolas', 10))
+        data_file_entry.grid(row=0, column=1, padx=5, sticky=tk.EW)
+        ttk.Button(input_frame, text="🔍 浏览...", command=self.browse_input_file, style='Tech.TButton').grid(row=0, column=2, padx=5)
         
         # 配置列权重，使文件输入框可以自适应扩展
         input_frame.columnconfigure(1, weight=1)
+        input_frame.columnconfigure(0, weight=0)
+        input_frame.columnconfigure(2, weight=0)
         
-        # 参数设置
-        param_frame = ttk.LabelFrame(main_frame, text="计算参数", padding="10")
-        param_frame.pack(fill=tk.X, pady=5)
+        # 参数设置 - 使用科技感样式
+        param_frame = ttk.LabelFrame(main_frame, text="⚙️ 计算参数", padding="15", style='Tech.TLabelframe')
+        param_frame.pack(fill=tk.X, pady=8)
         
         # 在原有参数下方添加机床原点设置（独占一行）
         ttk.Label(param_frame, text="机床原点:").grid(row=2, column=0, sticky=tk.W, pady=(10,0))
@@ -1836,12 +1991,27 @@ class MillingAnalysisTool:
         
         ttk.Label(param_frame, text="(将MRR恒定的连续区域划分为稳态区间)").grid(row=5, column=4, columnspan=2, padx=10, sticky=tk.W)
         
-        # 一键处理按钮
-        button_frame = ttk.Frame(main_frame)
-        button_frame.pack(pady=10)
+        # 配置 param_frame 列权重，确保输入框能自动拉伸
+        for col in range(7):
+            if col in [1, 2, 3, 4, 5]:
+                param_frame.columnconfigure(col, weight=1)
+            else:
+                param_frame.columnconfigure(col, weight=0)
         
-        process_btn = ttk.Button(button_frame, text="一键处理", command=self.one_click_process)
-        process_btn.pack(side=tk.LEFT, padx=5, pady=5, ipadx=30, ipady=10)
+        # 一键处理和保存按钮 - 科技感设计
+        button_frame = ttk.Frame(main_frame)
+        button_frame.pack(pady=15)
+        
+        # 主要操作按钮 - 一键处理
+        process_btn = ttk.Button(button_frame, text="⚡ 一键处理", 
+                                command=self.one_click_process, style='Primary.TButton')
+        process_btn.pack(side=tk.LEFT, padx=10)
+        
+        # 保存按钮
+        save_btn = ttk.Button(button_frame, text="💾 保存所有图表", 
+                             command=lambda: self.save_all_plots(silent=False), 
+                             style='Tech.TButton')
+        save_btn.pack(side=tk.LEFT, padx=10)
         
         # 状态栏
         self.status_var_data = tk.StringVar()
@@ -1858,17 +2028,34 @@ class MillingAnalysisTool:
         figure_container = ttk.Frame(main_frame)
         figure_container.pack(fill=tk.BOTH, expand=True, pady=10)
         
-        # 图表导航按钮
+        # 图表导航按钮 - 科技感设计
         nav_frame = ttk.Frame(figure_container)
-        nav_frame.pack(side=tk.TOP, fill=tk.X, pady=(0, 5))
+        nav_frame.pack(side=tk.TOP, fill=tk.X, pady=(0, 8))
         
-        self.prev_btn = ttk.Button(nav_frame, text="◀ 上一张", command=self.show_prev_figure, state=tk.DISABLED)
+        self.prev_btn = ttk.Button(nav_frame, text="◀ 上一张", command=self.show_prev_figure, 
+                                   state=tk.DISABLED, style='Tech.TButton')
         self.prev_btn.pack(side=tk.LEFT, padx=5)
         
-        self.figure_label = ttk.Label(nav_frame, text="", font=('Arial', 10, 'bold'))
+        self.figure_label = ttk.Label(nav_frame, text="", 
+                                      font=('Microsoft YaHei UI', 11, 'bold'),
+                                      foreground='#0066cc')
         self.figure_label.pack(side=tk.LEFT, expand=True)
+
+        ttk.Label(nav_frame, text="快速选择:", 
+                 font=('Microsoft YaHei UI', 10)).pack(side=tk.LEFT, padx=(5, 2))
+        self.figure_selector_var = tk.StringVar()
+        self.figure_selector = ttk.Combobox(
+            nav_frame,
+            textvariable=self.figure_selector_var,
+            state="readonly",
+            width=25,
+            font=('Microsoft YaHei UI', 10)
+        )
+        self.figure_selector.bind("<<ComboboxSelected>>", self.on_figure_selected)
+        self.figure_selector.pack(side=tk.LEFT, padx=5)
         
-        self.next_btn = ttk.Button(nav_frame, text="下一张 ▶", command=self.show_next_figure, state=tk.DISABLED)
+        self.next_btn = ttk.Button(nav_frame, text="下一张 ▶", command=self.show_next_figure, 
+                                  state=tk.DISABLED, style='Tech.TButton')
         self.next_btn.pack(side=tk.LEFT, padx=5)
         
         ttk.Button(nav_frame, text="保存所有图表", command=lambda: self.save_all_plots(silent=False)).pack(side=tk.LEFT, padx=5)
@@ -2425,7 +2612,7 @@ class MillingAnalysisTool:
             return 0.0, 0.0, 0.0, 0.0, 0.0, 0.0
     
     def one_click_process(self):
-        """一键处理：解析文件、生成工艺信息表和图表、自动保存"""
+        """一键处理：解析文件、生成工艺信息表和图表（不自动保存）"""
         input_file = self.input_file_path.get()
         
         if not input_file:
@@ -2446,24 +2633,22 @@ class MillingAnalysisTool:
             if not success:
                 return
             
-            # 第二步：生成图表
+            # 第二步：生成图表（不保存）
             self.status_var_data.set("正在生成图表...")
             self.root.update()
             
-            self.generate_plots(save=True)  # 直接保存图表
+            self.generate_plots(save=False)  # 不自动保存图表
             
             # 第三步：显示结果
             self.show_current_figure(0)  # 显示第一张图
             
-            # 完成提示
-            result_dir = self.processed_data_dir
+            # 完成提示 - 提醒用户需要手动保存
             messagebox.showinfo("处理完成", 
-                              f"处理成功！\n\n"
-                              f"工艺信息表: {self.processed_file_path}\n\n"
-                              f"图表文件夹: {result_dir}\n\n"
-                              f"共生成7张图表，已自动保存到图表文件夹中")
+                              f"数据处理成功！\n\n"
+                              f"工艺信息表已生成，共{len(self.figures)}张图表已加载。\n\n"
+                              f"⚠️ 请点击'保存所有图表'按钮保存结果。")
             
-            self.status_var_data.set(f"处理完成！文件和图表已保存到: {result_dir}")
+            self.status_var_data.set(f"处理完成！请点击'保存所有图表'保存结果")
             
         except Exception as e:
             messagebox.showerror("处理错误", f"处理过程中发生错误:\n{str(e)}")
@@ -2529,53 +2714,90 @@ class MillingAnalysisTool:
                 twin.grid(False)
                 return twin
 
-            # 1. ap-s/N 图 - 使用阶梯图显示，每行在其行程区间内保持恒定
-            fig1, ax1 = plt.subplots(figsize=(12, 7), dpi=150)
+            # 1. ap-s/N 图 - 使用阶梯图显示，每行在其行程区间内保持恒定 - 白色背景
+            fig1, ax1 = plt.subplots(figsize=(16, 9), dpi=100)
+            fig1.patch.set_facecolor('white')
+            ax1.set_facecolor('white')
+            
             # 使用step函数，where='post'表示在区间内保持值不变
-            ax1.step(cumulative_s, ap_values, 'k-', linewidth=0.5, where='post')
-            ax1.set_title('切深变化', fontsize=14, fontweight='bold')
-            ax1.set_xlabel('行程 s (mm)', fontsize=12)
-            ax1.set_ylabel('切深 ap (mm)', fontsize=12)
-            ax1.grid(True, linestyle='--', alpha=0.7)
-            ax1.tick_params(labelsize=10)
+            ax1.step(cumulative_s, ap_values, color='black', linewidth=0.8, where='post', zorder=5)
+            ax1.set_xlabel('行程 s (mm)', fontsize=14, fontweight='bold', color='#333333')
+            ax1.set_ylabel('切深 ap (mm)', fontsize=14, fontweight='bold', color='#333333')
+            ax1.tick_params(labelsize=13, colors='#333333')
+            
+            # 应用样式和调整范围
+            ax1.set_title('切深变化', fontsize=18, fontweight='bold', color='#333333', pad=15)
+            ax1.grid(True, alpha=0.3, linestyle='--', linewidth=0.5)
+            x_min, x_max = ax1.get_xlim()
+            y_min, y_max = ax1.get_ylim()
+            x_range, y_range = x_max - x_min, y_max - y_min
+            ax1.set_xlim(x_min - x_range * 0.05, x_max + x_range * 0.15)
+            ax1.set_ylim(y_min - y_range * 0.05, y_max + y_range * 0.15)
             add_n_axis(ax1, cumulative_s)
-            fig1.tight_layout(pad=1.5)
+            fig1.subplots_adjust(left=0.10, right=0.90, top=0.94, bottom=0.08)
             self.figures.append(fig1)
             
-            # 2. ae-s/N 图 - 阶梯图
-            fig2, ax2 = plt.subplots(figsize=(12, 7), dpi=150)
-            ax2.step(cumulative_s, ae_values, 'k-', linewidth=0.5, where='post')
-            ax2.set_title('切宽变化', fontsize=14, fontweight='bold')
-            ax2.set_xlabel('行程 s (mm)', fontsize=12)
-            ax2.set_ylabel('切宽 ae (mm)', fontsize=12)
-            ax2.grid(True, linestyle='--', alpha=0.7)
-            ax2.tick_params(labelsize=10)
+            # 2. ae-s/N 图 - 阶梯图 - 白色背景
+            fig2, ax2 = plt.subplots(figsize=(16, 9), dpi=100)
+            fig2.patch.set_facecolor('white')
+            ax2.set_facecolor('white')
+            
+            ax2.step(cumulative_s, ae_values, color='black', linewidth=0.8, where='post', zorder=5)
+            ax2.set_xlabel('行程 s (mm)', fontsize=14, fontweight='bold', color='#333333')
+            ax2.set_ylabel('切宽 ae (mm)', fontsize=14, fontweight='bold', color='#333333')
+            ax2.tick_params(labelsize=13, colors='#333333')
+            
+            ax2.set_title('切宽变化', fontsize=18, fontweight='bold', color='#333333', pad=15)
+            ax2.grid(True, alpha=0.3, linestyle='--', linewidth=0.5)
+            x_min, x_max = ax2.get_xlim()
+            y_min, y_max = ax2.get_ylim()
+            x_range, y_range = x_max - x_min, y_max - y_min
+            ax2.set_xlim(x_min - x_range * 0.05, x_max + x_range * 0.15)
+            ax2.set_ylim(y_min - y_range * 0.05, y_max + y_range * 0.15)
             add_n_axis(ax2, cumulative_s)
-            fig2.tight_layout(pad=1.5)
+            fig2.subplots_adjust(left=0.10, right=0.90, top=0.94, bottom=0.08)
             self.figures.append(fig2)
             
-            # 3. MRR-s/N 图 - 阶梯图
-            fig3, ax3 = plt.subplots(figsize=(12, 7), dpi=150)
-            ax3.step(cumulative_s, MRR_values, 'k-', linewidth=0.5, where='post')
-            ax3.set_title('材料去除率', fontsize=14, fontweight='bold')
-            ax3.set_xlabel('行程 s (mm)', fontsize=12)
-            ax3.set_ylabel('材料去除率 MRR (mm$^3$/s)', fontsize=12)
-            ax3.grid(True, linestyle='--', alpha=0.7)
-            ax3.tick_params(labelsize=10)
+            # 3. MRR-s/N 图 - 阶梯图 - 白色背景
+            fig3, ax3 = plt.subplots(figsize=(16, 9), dpi=100)
+            fig3.patch.set_facecolor('white')
+            ax3.set_facecolor('white')
+            
+            ax3.step(cumulative_s, MRR_values, color='black', linewidth=0.8, where='post', zorder=5)
+            ax3.set_xlabel('行程 s (mm)', fontsize=14, fontweight='bold', color='#333333')
+            ax3.set_ylabel('材料去除率 MRR (mm$^3$/s)', fontsize=14, fontweight='bold', color='#333333')
+            ax3.tick_params(labelsize=13, colors='#333333')
+            
+            ax3.set_title('材料去除率', fontsize=18, fontweight='bold', color='#333333', pad=15)
+            ax3.grid(True, alpha=0.3, linestyle='--', linewidth=0.5)
+            x_min, x_max = ax3.get_xlim()
+            y_min, y_max = ax3.get_ylim()
+            x_range, y_range = x_max - x_min, y_max - y_min
+            ax3.set_xlim(x_min - x_range * 0.05, x_max + x_range * 0.15)
+            ax3.set_ylim(y_min - y_range * 0.05, y_max + y_range * 0.15)
             add_n_axis(ax3, cumulative_s)
-            fig3.tight_layout(pad=1.5)
+            fig3.subplots_adjust(left=0.10, right=0.90, top=0.94, bottom=0.08)
             self.figures.append(fig3)
             
-            # 4. P-s/N 图 - 阶梯图
-            fig4, ax4 = plt.subplots(figsize=(12, 7), dpi=150)
-            ax4.step(cumulative_s, P_values, 'k-', linewidth=0.5, where='post')
-            ax4.set_title('主轴功率预测', fontsize=14, fontweight='bold')
-            ax4.set_xlabel('行程 s (mm)', fontsize=12)
-            ax4.set_ylabel('功率 P (W)', fontsize=12)
-            ax4.grid(True, linestyle='--', alpha=0.7)
-            ax4.tick_params(labelsize=10)
+            # 4. P-s/N 图 - 阶梯图 - 白色背景
+            fig4, ax4 = plt.subplots(figsize=(16, 9), dpi=100)
+            fig4.patch.set_facecolor('white')
+            ax4.set_facecolor('white')
+            
+            ax4.step(cumulative_s, P_values, color='black', linewidth=0.8, where='post', zorder=5)
+            ax4.set_xlabel('行程 s (mm)', fontsize=14, fontweight='bold', color='#333333')
+            ax4.set_ylabel('功率 P (W)', fontsize=14, fontweight='bold', color='#333333')
+            ax4.tick_params(labelsize=13, colors='#333333')
+            
+            ax4.set_title('主轴功率预测', fontsize=18, fontweight='bold', color='#333333', pad=15)
+            ax4.grid(True, alpha=0.3, linestyle='--', linewidth=0.5)
+            x_min, x_max = ax4.get_xlim()
+            y_min, y_max = ax4.get_ylim()
+            x_range, y_range = x_max - x_min, y_max - y_min
+            ax4.set_xlim(x_min - x_range * 0.05, x_max + x_range * 0.15)
+            ax4.set_ylim(y_min - y_range * 0.05, y_max + y_range * 0.15)
             add_n_axis(ax4, cumulative_s)
-            fig4.tight_layout(pad=1.5)
+            fig4.subplots_adjust(left=0.10, right=0.90, top=0.94, bottom=0.08)
             self.figures.append(fig4)
             
             # 5. MRR稳态区间划分图 - 如果启用
@@ -2584,25 +2806,70 @@ class MillingAnalysisTool:
                     MRR_values, s_values, cumulative_s, n_values
                 )
                 
-                # 生成MRR稳态区间图
-                fig5, ax5 = plt.subplots(figsize=(12, 7), dpi=150)
-                ax5.step(cumulative_s, MRR_values, 'k-', linewidth=0.5, where='post', label='MRR')
+                # 生成MRR稳态区间图 - 白色背景
+                fig5, ax5 = plt.subplots(figsize=(16, 9), dpi=100)
+                fig5.patch.set_facecolor('white')
+                ax5.set_facecolor('white')
                 
-                # 标记稳态区间
-                for interval in self.mrr_intervals:
+                # 标记稳态区间 - 使用清晰的配色（先绘制区间，再绘制曲线）
+                interval_colors = [
+                    '#ffcccc', '#ccffcc', '#ccccff', '#ffffcc', 
+                    '#ffccff', '#ccffff', '#ffddcc', '#ddffcc',
+                ]
+                # 只画背景色块，不画边界线（避免区间太多时遮盖数据）
+                for idx, interval in enumerate(self.mrr_intervals):
                     start_s = interval['start_s']
                     end_s = interval['end_s']
-                    ax5.axvspan(start_s, end_s, alpha=0.3, color='green', edgecolor='darkgreen', linewidth=0.3)
+                    color = interval_colors[idx % len(interval_colors)]
+                    # 关键：提高 alpha 值使区间更明显，zorder=0 确保在最底层
+                    ax5.axvspan(start_s, end_s, alpha=0.4, facecolor=color, 
+                               edgecolor='none', linewidth=0, zorder=0)
                 
-                ax5.set_title(f'MRR稳态区间划分 (共{len(self.mrr_intervals)}个区间)', fontsize=14, fontweight='bold')
-                ax5.set_xlabel('行程 s (mm)', fontsize=12)
-                ax5.set_ylabel('材料去除率 MRR (mm$^3$/s)', fontsize=12)
-                ax5.grid(True, linestyle='--', alpha=0.7)
-                ax5.tick_params(labelsize=10)
-                ax5.legend(loc='upper right')
+                # 绘制MRR曲线（在区间上方）- 使用黑色细线，zorder=10 确保在最上层
+                ax5.step(cumulative_s, MRR_values, color='black', linewidth=0.8, 
+                        where='post', label='MRR', zorder=10)
+                
+                ax5.set_xlabel('行程 s (mm)', fontsize=14, fontweight='bold', color='#333333')
+                ax5.set_ylabel('材料去除率 MRR (mm$^3$/s)', fontsize=14, fontweight='bold', color='#333333')
+                ax5.tick_params(labelsize=13, colors='#333333')
+                
+                # 配置图例
+                legend = ax5.legend(loc='upper right', fontsize=13, framealpha=0.9, shadow=True)
+                legend.get_frame().set_facecolor('white')
+                legend.get_frame().set_edgecolor('#333333')
+                legend.get_frame().set_linewidth(1.5)
+                for text in legend.get_texts():
+                    text.set_color('#333333')
+                
+                # 设置标题和调整布局
+                ax5.set_title(f'MRR稳态区间划分 (共{len(self.mrr_intervals)}个区间)', 
+                             fontsize=18, fontweight='bold', color='#333333', pad=15)
+                # 关键：网格设置为zorder=-1，确保在最底层
+                ax5.grid(True, alpha=0.3, linestyle='--', linewidth=0.5, zorder=-1)
+                
+                # 关键：强制设置Y轴范围，留出上下10%的余量，防止图形顶格
+                if MRR_values:
+                    mrr_min = min(MRR_values)
+                    mrr_max = max(MRR_values)
+                    mrr_range = mrr_max - mrr_min if mrr_max > mrr_min else 1
+                    ax5.set_ylim(mrr_min - mrr_range * 0.1, mrr_max + mrr_range * 0.1)
+                
+                # 调整X轴范围
+                x_min, x_max = ax5.get_xlim()
+                x_range = x_max - x_min
+                ax5.set_xlim(x_min - x_range * 0.05, x_max + x_range * 0.15)
+                
                 add_n_axis(ax5, cumulative_s)
-                fig5.tight_layout(pad=1.5)
+                fig5.subplots_adjust(left=0.10, right=0.90, top=0.94, bottom=0.08)
                 self.figures.append(fig5)
+            
+            # 更新图表名称列表与下拉选择
+            self.figure_names = ["切深变化 (ap-s)", "切宽变化 (ae-s)", "材料去除率 (MRR-s)", "主轴功率预测 (P-s)"]
+            if self.enable_mrr_steady.get():
+                self.figure_names.append("MRR稳态区间划分")
+            self.figure_selector["values"] = self.figure_names
+            if self.figure_names:
+                self.figure_selector.current(0)
             
             # 如果设置了保存选项，自动保存图表
             if save:
@@ -2623,66 +2890,36 @@ class MillingAnalysisTool:
             return False
     
     def show_current_figure(self, index=0):
-        """显示当前图表"""
+        """显示当前图表 - 直接嵌入原始Figure，保留所有元素"""
         if not self.figures or index >= len(self.figures):
             return
-            
-        # 保存当前索引
-        self.current_figure_index = index
-        
-        # 清除当前画布
-        self.fig_data.clf()
-        self.ax_data = self.fig_data.add_subplot(111)
-        
-        # 获取当前图表并复制到预览画布
-        current_fig = self.figures[index]
-        primary_ax = current_fig.axes[0]
-        
-        # 复制图表内容
-        for line in primary_ax.get_lines():
-            self.ax_data.plot(line.get_xdata(), line.get_ydata(), 
-                             color=line.get_color(), 
-                             linestyle=line.get_linestyle(),
-                             linewidth=line.get_linewidth(),
-                             label=line.get_label())
-        
-        # 复制标题和标签 - 使用与原图相同的字体设置
-        self.ax_data.set_title(primary_ax.get_title(), fontsize=14, fontweight='bold')
-        self.ax_data.set_xlabel(primary_ax.get_xlabel(), fontsize=12)
-        self.ax_data.set_ylabel(primary_ax.get_ylabel(), fontsize=12)
-        
-        # 复制网格设置
-        self.ax_data.grid(True, linestyle='--', alpha=0.7)
-        
-        # 设置刻度标签字体大小
-        self.ax_data.tick_params(labelsize=10)
-        
-        # 复制坐标轴范围
-        self.ax_data.set_xlim(primary_ax.get_xlim())
-        self.ax_data.set_ylim(primary_ax.get_ylim())
 
-        # 如果存在顶部N轴，则复制刻度与标签
-        if len(current_fig.axes) > 1:
-            secondary_ax_source = current_fig.axes[1]
-            top_ax = self.ax_data.twiny()
-            top_ax.set_xlim(self.ax_data.get_xlim())
-            top_ax.set_xticks(secondary_ax_source.get_xticks())
-            top_ax.set_xticklabels([tick.get_text() for tick in secondary_ax_source.get_xticklabels()], rotation=45, ha='left', fontsize=8)
-            top_ax.set_xlabel(secondary_ax_source.get_xlabel())
-            top_ax.grid(False)
-        
-        # 调整布局确保完整显示，增加边距
-        try:
-            self.fig_data.tight_layout(pad=2.0, rect=[0, 0.03, 1, 0.97])
-        except:
-            # 如果tight_layout失败，使用subplots_adjust
-            self.fig_data.subplots_adjust(left=0.1, right=0.95, top=0.92, bottom=0.1)
-        
-        # 更新导航按钮状态
+        self.current_figure_index = index
+        fig = self.figures[index]
+
+        # 清空图表预览框（删除旧canvas）
+        for child in self.data_figure_frame.winfo_children():
+            child.destroy()
+
+        # 直接把原始figure嵌进来（保留 axvspan/step/twinx 等所有元素）
+        self.canvas_data = FigureCanvasTkAgg(fig, master=self.data_figure_frame)
+        w = self.canvas_data.get_tk_widget()
+        w.pack(fill=tk.BOTH, expand=True)
+
+        # 让滚轮缩放仍然可用：把 self.ax_data 指向当前主轴
+        self.ax_data = fig.axes[0] if fig.axes else None
+        self.canvas_data.mpl_connect('scroll_event', self.on_data_scroll_zoom)
+
         self.update_nav_buttons()
-        
-        # 重绘画布
-        self.canvas_data.draw()
+        self.canvas_data.draw_idle()
+
+    def on_figure_selected(self, event=None):
+        """下拉选择图表"""
+        if not self.figure_names:
+            return
+        selected = self.figure_selector.current()
+        if selected >= 0:
+            self.show_current_figure(selected)
     
     def save_all_plots(self, silent=False):
         """保存所有图表到处理数据时创建的目录"""
@@ -2786,11 +3023,11 @@ class MillingAnalysisTool:
             start_idx = i
             start_s = cumulative_s[i] - s_values[i] if i > 0 else 0  # 该行起始位置
             
-            # 查找MRR完全相同的连续区域 - 使用严格的相等判断
+            # 查找MRR完全相同的连续区域 - 使用浮点数近似比较
             j = i + 1
             while j < len(MRR_values):
-                # 使用更严格的判断：MRR值必须完全相等
-                if MRR_values[j] == current_mrr:
+                # 使用浮点数近似比较，容差为 1e-5
+                if abs(MRR_values[j] - current_mrr) < 1e-5:
                     j += 1
                 else:
                     break
@@ -2827,14 +3064,19 @@ class MillingAnalysisTool:
             self.prev_btn.config(state=tk.DISABLED)
             self.next_btn.config(state=tk.DISABLED)
             self.figure_label.config(text="")
+            self.figure_selector["values"] = []
+            self.figure_selector_var.set("")
             return
         
         # 更新标签
-        figure_names = ["切深变化 (ap-s)", "切宽变化 (ae-s)", "材料去除率 (MRR-s)", "主轴功率预测 (P-s)", "MRR稳态区间划分"]
-        if self.current_figure_index < len(figure_names):
-            self.figure_label.config(text=f"{self.current_figure_index + 1}/{len(self.figures)} - {figure_names[self.current_figure_index]}")
+        if self.current_figure_index < len(self.figure_names):
+            self.figure_label.config(text=f"{self.current_figure_index + 1}/{len(self.figures)} - {self.figure_names[self.current_figure_index]}")
         else:
             self.figure_label.config(text=f"{self.current_figure_index + 1}/{len(self.figures)}")
+
+        # 同步下拉选择
+        if self.figure_names and self.current_figure_index < len(self.figure_names):
+            self.figure_selector.current(self.current_figure_index)
         
         # 更新按钮状态
         self.prev_btn.config(state=tk.NORMAL if self.current_figure_index > 0 else tk.DISABLED)
@@ -3464,14 +3706,17 @@ class MillingAnalysisTool:
             self.ax_steady_time.clear()
             ax1 = self.ax_steady_time
             ax1.plot(np.asarray(self.cumulative_time), np.asarray(self.currents), 'b-', linewidth=1.0, label='电流值')
-            for start_idx, end_idx in self.intervals:
+            interval_colors = ['#2ecc71', '#f39c12', '#3498db', '#9b59b6', '#e74c3c']
+            for idx, (start_idx, end_idx) in enumerate(self.intervals):
                 start_time = self.cumulative_time[start_idx]
                 end_time = self.cumulative_time[end_idx]
-                ax1.axvspan(start_time, end_time, alpha=0.6, color='red', # type: ignore
-                           edgecolor='darkred', linewidth=1.0)
+                color = interval_colors[idx % len(interval_colors)]
+                ax1.axvspan(start_time, end_time, alpha=0.35, color=color, # type: ignore
+                           edgecolor=color, linewidth=0.8)
             ax1.set_title('时间域稳态区间')
             ax1.set_xlabel('时间 (秒)')
             ax1.set_ylabel('电流 (A)')
+            self.cap_y_axis(ax1, [self.currents])
             ax1.grid(True, linestyle='--', alpha=0.7)
             ax1.legend(loc='upper right')
             
@@ -3480,13 +3725,15 @@ class MillingAnalysisTool:
             ax2 = self.ax_steady_n
             positions = range(len(self.n_values))
             ax2.plot(positions, np.asarray(self.currents), 'g-', linewidth=1.0, label='电流值')
-            for start_idx, end_idx in self.intervals:
+            for idx, (start_idx, end_idx) in enumerate(self.intervals):
                 end_idx = min(end_idx, len(self.n_values)-1)
-                ax2.axvspan(start_idx, end_idx, alpha=0.6, color='magenta', 
-                           edgecolor='darkmagenta', linewidth=1.0)
+                color = interval_colors[idx % len(interval_colors)]
+                ax2.axvspan(start_idx, end_idx, alpha=0.35, color=color, 
+                           edgecolor=color, linewidth=0.8)
             ax2.set_title('指令域稳态区间')
             ax2.set_xlabel('指令行号索引')
             ax2.set_ylabel('电流 (A)')
+            self.cap_y_axis(ax2, [self.currents])
             if len(self.n_values) > 100:
                 step = max(1, len(self.n_values) // 20)
                 tick_positions = positions[::step]
@@ -4507,6 +4754,102 @@ class MillingAnalysisTool:
         # 更新显示
         self.update_segment_display()
     
+    def setup_tech_theme(self):
+        """配置科技感主题样式"""
+        style = ttk.Style()
+        
+        # 设置主题为clam（比较容易自定义）
+        try:
+            style.theme_use('clam')
+        except:
+            pass
+        
+        # 配置按钮样式 - 科技感蓝色
+        style.configure('Tech.TButton',
+                       background='#0066cc',
+                       foreground='white',
+                       font=('Microsoft YaHei UI', 11, 'bold'),
+                       borderwidth=0,
+                       focuscolor='none',
+                       padding=(20, 10))
+        
+        style.map('Tech.TButton',
+                 background=[('active', '#0088ff'), ('pressed', '#004499')],
+                 foreground=[('active', 'white'), ('pressed', 'white')])
+        
+        # 配置主要操作按钮样式 - 霓虹绿
+        style.configure('Primary.TButton',
+                       background='#00cc66',
+                       foreground='white',
+                       font=('Microsoft YaHei UI', 12, 'bold'),
+                       borderwidth=0,
+                       focuscolor='none',
+                       padding=(25, 12))
+        
+        style.map('Primary.TButton',
+                 background=[('active', '#00ff88'), ('pressed', '#009944')],
+                 foreground=[('active', 'white'), ('pressed', 'white')])
+        
+        # 配置危险操作按钮 - 橙红色
+        style.configure('Danger.TButton',
+                       background='#ff6600',
+                       foreground='white',
+                       font=('Microsoft YaHei UI', 11, 'bold'),
+                       borderwidth=0,
+                       focuscolor='none',
+                       padding=(20, 10))
+        
+        style.map('Danger.TButton',
+                 background=[('active', '#ff8833'), ('pressed', '#cc5200')],
+                 foreground=[('active', 'white'), ('pressed', 'white')])
+        
+        # 配置标签框样式
+        style.configure('Tech.TLabelframe',
+                       background='#f0f4f8',
+                       foreground='#2c3e50',
+                       font=('Microsoft YaHei UI', 10, 'bold'),
+                       borderwidth=2,
+                       relief='groove')
+        
+        style.configure('Tech.TLabelframe.Label',
+                       background='#f0f4f8',
+                       foreground='#0066cc',
+                       font=('Microsoft YaHei UI', 11, 'bold'))
+    
+    def apply_tech_theme_to_axes(self, ax):
+        """应用主题到坐标轴"""
+        # 设置白色背景
+        ax.set_facecolor('white')
+        
+        # 设置坐标轴边框颜色
+        for spine in ax.spines.values():
+            spine.set_edgecolor('#333333')
+            spine.set_linewidth(1.5)
+        
+        # 设置刻度颜色
+        ax.tick_params(axis='both', colors='#333333', labelsize=12)
+        
+        # 设置网格
+        ax.grid(True, linestyle=':', alpha=0.3, linewidth=0.5, color='gray', zorder=0)
+    
+    def apply_tech_theme_to_figure(self, fig, ax, title):
+        """应用主题到整个图表"""
+        # 设置图表背景为白色
+        fig.patch.set_facecolor('white')
+        
+        # 应用坐标轴主题
+        self.apply_tech_theme_to_axes(ax)
+        
+        # 设置标题样式
+        ax.set_title(title, fontsize=18, fontweight='bold', color='#333333', pad=15)
+        
+        # 设置轴标签颜色和大小
+        ax.set_xlabel(ax.get_xlabel(), fontsize=14, fontweight='bold', color='#333333')
+        ax.set_ylabel(ax.get_ylabel(), fontsize=14, fontweight='bold', color='#333333')
+        
+        # 调整布局以居中对称
+        fig.subplots_adjust(left=0.10, right=0.90, top=0.94, bottom=0.08)
+    
     def setup_chart_interactions(self):
         """设置图表交互功能（缩放、滚动等）"""
         # 为实际负载图表添加滚动缩放功能
@@ -4543,22 +4886,57 @@ class MillingAnalysisTool:
         else:
             return
         
-        # 计算新的坐标轴范围（以鼠标位置为中心缩放）
+        # 只缩放x轴（横向缩放）
         new_width = (cur_xlim[1] - cur_xlim[0]) * scale_factor
-        new_height = (cur_ylim[1] - cur_ylim[0]) * scale_factor
         
         relx = (cur_xlim[1] - xdata) / (cur_xlim[1] - cur_xlim[0])
-        rely = (cur_ylim[1] - ydata) / (cur_ylim[1] - cur_ylim[0])
         
         new_xlim = [xdata - new_width * (1 - relx), xdata + new_width * relx]
-        new_ylim = [ydata - new_height * (1 - rely), ydata + new_height * rely]
         
-        # 应用新的坐标轴范围
+        # 应用新的坐标轴范围（只改变x轴）
         self.ax_actual_load.set_xlim(new_xlim)
-        self.ax_actual_load.set_ylim(new_ylim)
         
         # 重绘图表
         self.canvas_actual_load.draw()
+    
+    def on_data_scroll_zoom(self, event):
+        """处理数据处理标签页图表的鼠标滚轮横向缩放事件"""
+        if event.inaxes != self.ax_data:
+            return
+        if not self.data:
+            return
+        
+        # 获取当前坐标轴范围
+        cur_xlim = self.ax_data.get_xlim()
+        
+        # 获取鼠标在数据坐标中的位置
+        xdata = event.xdata
+        
+        if xdata is None:
+            return
+        
+        # 根据滚轮方向确定缩放方向
+        if event.button == 'up':
+            # 放大
+            scale_factor = 1 / 1.2
+        elif event.button == 'down':
+            # 缩小
+            scale_factor = 1.2
+        else:
+            return
+        
+        # 只缩放x轴（横向缩放）
+        new_width = (cur_xlim[1] - cur_xlim[0]) * scale_factor
+        
+        relx = (cur_xlim[1] - xdata) / (cur_xlim[1] - cur_xlim[0])
+        
+        new_xlim = [xdata - new_width * (1 - relx), xdata + new_width * relx]
+        
+        # 应用新的坐标轴范围（只改变x轴）
+        self.ax_data.set_xlim(new_xlim)
+        
+        # 重绘图表
+        self.canvas_data.draw()
     
     def reset_chart_view(self):
         """重置图表视图到原始范围"""
@@ -4703,57 +5081,70 @@ class MillingAnalysisTool:
             pass
 
     def on_window_resize(self, event):
-        """处理窗口大小变化事件"""
+        """处理窗口大小变化事件 - 添加防抖动机制"""
         # 只处理主窗口的resize事件，避免子组件的resize事件
         if event.widget == self.root:
-            # 使用after方法延迟执行，避免频繁调用
-            self.root.after_idle(self.adjust_figure_sizes)
-            # 同时调整实际负载图表
-            self.root.after_idle(self.adjust_actual_load_chart_size)
+            # 取消之前的定时器
+            if self._resize_timer is not None:
+                self.root.after_cancel(self._resize_timer)
+            # 设置新的延迟调用（300ms延迟，避免拖拽时频繁调用）
+            self._resize_timer = self.root.after(300, self._do_resize)
+    
+    def _do_resize(self):
+        """实际执行resize操作"""
+        self._resize_timer = None
+        self.adjust_figure_sizes()
+        self.adjust_actual_load_chart_size()
     
     def adjust_figure_sizes(self):
-        """根据当前窗口大小调整图表大小"""
+        """根据当前窗口大小调整图表大小 - 使用自动布局功能"""
         try:
-            # 获取当前窗口大小
-            window_width = self.root.winfo_width()
-            window_height = self.root.winfo_height()
-            
-            if window_width <= 1 or window_height <= 1:  # 窗口还未完全初始化
+            # 获取图表容器的实际像素尺寸
+            if hasattr(self, 'data_figure_frame'):
+                w = self.data_figure_frame.winfo_width()
+                h = self.data_figure_frame.winfo_height()
+            else:
                 return
             
-            # 计算新的图表尺寸 - 更好地适应窗口大小
-            # 使用DPI感知的尺寸计算
-            dpi = self.fig_actual_load.dpi if hasattr(self, 'fig_actual_load') else 100
-            fig_width = max(8, window_width / dpi * 0.9)  # 使用窗口宽度的90%
-            fig_height = max(5, window_height / dpi * 0.6)  # 使用窗口高度的60%
+            # 容器还未完全初始化
+            if w < 100 or h < 100:
+                return
             
-            # 调整各个图表的大小
+            # 关键：动态设置DPI，使用标准100 DPI
+            dpi = 100
+            new_w = w / dpi
+            new_h = h / dpi * 0.95  # 留一点余量
+            
+            # 调整所有缓存的图表大小
+            for fig in self.figures:
+                fig.set_size_inches(new_w, new_h)
+                # 关键：使用 tight_layout 自动处理坐标轴标签被切掉的问题
+                fig.tight_layout(pad=2.0)
+            
+            # 调整各个显示图表的大小
             if hasattr(self, 'fig_data'):
-                self.fig_data.set_size_inches(fig_width, fig_height)
+                self.fig_data.set_size_inches(new_w, new_h)
                 self.fig_data.tight_layout(pad=2.0)
                 self.canvas_data.draw_idle()
             
             if hasattr(self, 'fig_actual_load'):
-                self.fig_actual_load.set_size_inches(fig_width, fig_height)
-                # 重新调整子图边距以保持良好布局
-                self.fig_actual_load.subplots_adjust(
-                    left=0.08, bottom=0.10, right=0.96, top=0.94,
-                    wspace=0.15, hspace=0.15
-                )
+                self.fig_actual_load.set_size_inches(new_w, new_h)
+                # 使用 tight_layout 替代手动调整
+                self.fig_actual_load.tight_layout(pad=2.0)
                 self.canvas_actual_load.draw_idle()
             
             # 稍小的尺寸用于左右布局的图表
-            steady_fig_width = fig_width * 0.8
-            steady_fig_height = fig_height * 0.9
+            steady_w = new_w * 0.9
+            steady_h = new_h * 0.9
             
             if hasattr(self, 'fig_steady_time'):
-                self.fig_steady_time.set_size_inches(steady_fig_width, steady_fig_height)
-                self.fig_steady_time.tight_layout(pad=1.5)
+                self.fig_steady_time.set_size_inches(steady_w, steady_h)
+                self.fig_steady_time.tight_layout(pad=2.0)
                 self.canvas_steady_time.draw_idle()
             
             if hasattr(self, 'fig_steady_n'):
-                self.fig_steady_n.set_size_inches(steady_fig_width, steady_fig_height)
-                self.fig_steady_n.tight_layout(pad=1.5)
+                self.fig_steady_n.set_size_inches(steady_w, steady_h)
+                self.fig_steady_n.tight_layout(pad=2.0)
                 self.canvas_steady_n.draw_idle()
                 
         except Exception as e:
